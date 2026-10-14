@@ -66,3 +66,16 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# Python tooling
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local secrets and OS files
+.env
+.DS_Store
+
+# Temporary simulation outputs
+results/tmp/
