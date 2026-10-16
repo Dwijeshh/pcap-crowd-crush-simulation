@@ -79,3 +79,5 @@ venv/
 
 # Temporary simulation outputs
 results/tmp/
+results/samples/*_snapshots.csv
+results/samples/*_summary.csv

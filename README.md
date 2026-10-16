@@ -31,8 +31,33 @@ Sammit starts with a verified sequential model. Parallel implementations follow 
 
 ## Current status
 
-Repository scaffold only. Simulation executables and model equations have not been implemented.
-CMake currently configures the project but has no executable targets.
+Sammit's sequential reference, shared movement kernel, scenario files, and
+dependency-free visualization tools are implemented. CUDA builds automatically
+when CMake detects a CUDA toolkit. OpenMP, MPI, hybrid integration, and shared
+risk metrics are still team work. The CUDA path needs validation on an NVIDIA
+GPU before it can be called verified.
+
+## Build and run
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
+ctest --test-dir build --output-on-failure
+mkdir -p results/tmp
+build/pcap_sequential configs/wide_exit.cfg results/tmp/wide
+# If CUDA was detected:
+build/pcap_cuda configs/wide_exit.cfg results/tmp/wide_cuda 256
+python scripts/visualize.py animate configs/wide_exit.cfg results/tmp/wide_snapshots.csv results/tmp/wide.html
+python scripts/visualize.py heatmap configs/wide_exit.cfg results/tmp/wide_snapshots.csv results/tmp/wide_heatmap.svg
+python scripts/visualize.py timeseries configs/wide_exit.cfg results/tmp/wide_snapshots.csv results/tmp/wide_summary.csv results/tmp/wide
+```
+
+On multi-configuration generators, executables may be under `build/Release/`.
+Each run writes `_snapshots.csv`, `_summary.csv` and `_run.csv` at the output
+prefix. Create the parent directory first. All visualization and CSV writing
+occurs outside the CPU update timer. Use identical scenario files and seeds
+when comparing backends. See [the model specification](docs/model_specification.md)
+for equations and timing definitions.
 
 ## Development order
 
