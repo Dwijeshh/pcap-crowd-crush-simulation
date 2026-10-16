@@ -33,9 +33,11 @@ Sammit starts with a verified sequential model. Parallel implementations follow 
 
 Sammit's sequential reference, shared movement kernel, scenario files, and
 dependency-free visualization tools are implemented. CUDA builds automatically
-when CMake detects a CUDA toolkit. OpenMP, MPI, hybrid integration, and shared
-risk metrics are still team work. The CUDA path needs validation on an NVIDIA
-GPU before it can be called verified.
+when CMake detects a CUDA toolkit. Sammit's CUDA path was built and checked
+against the sequential reference on an RTX 3050; see
+[CUDA validation](docs/cuda_validation.md) for reproducible Windows commands
+and results. OpenMP, MPI, hybrid integration, and shared risk metrics are still
+team work.
 
 ## Build and run
 
