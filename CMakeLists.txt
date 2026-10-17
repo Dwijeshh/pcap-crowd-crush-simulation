@@ -5,5 +5,26 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Scaffold only: add executable targets as each backend is implemented.
-# Enable CUDA and discover MPI/OpenMP when their targets are introduced.
+add_library(pcap_common src/common/config.cpp src/common/simulation.cpp src/common/output.cpp)
+target_include_directories(pcap_common PUBLIC include)
+add_executable(pcap_sequential src/sequential/main.cpp)
+target_link_libraries(pcap_sequential PRIVATE pcap_common)
+
+include(CheckLanguage)
+check_language(CUDA)
+if(CMAKE_CUDA_COMPILER)
+    enable_language(CUDA)
+    add_library(pcap_cuda_backend src/cuda/backend.cu)
+    target_include_directories(pcap_cuda_backend PUBLIC include)
+    set_target_properties(pcap_cuda_backend PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON)
+    add_executable(pcap_cuda src/cuda/main.cu)
+    target_link_libraries(pcap_cuda PRIVATE pcap_common pcap_cuda_backend)
+    set_target_properties(pcap_cuda PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON)
+endif()
+
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(pcap_model_tests tests/model_tests.cpp)
+    target_link_libraries(pcap_model_tests PRIVATE pcap_common)
+    add_test(NAME model COMMAND pcap_model_tests)
+endif()

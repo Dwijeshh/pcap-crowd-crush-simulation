@@ -1,5 +1,9 @@
 # Scenario configurations
 
-Add wide-exit, narrow-exit and obstacle scenarios after agreeing on the parser and schema.
-Record room geometry, pedestrian count, seed, time step, step count, exit geometry and model constants.
-Use the same scenario across all backends. Keep risk thresholds documented and configurable.
+The `.cfg` files use one `key=value` pair per line, with `#` comments.
+The parser rejects unknown and duplicate keys. Defaults and equations are in
+`include/config.hpp` and `docs/model_specification.md`. The three committed
+scenarios share the same seed, crowd, force constants and duration, and vary
+only the exit width or obstacle. They support a controlled geometry demo.
+For crowd scaling, enlarge the room or reduce body radius when required to
+fit non-overlapping initial positions; record those changes with results.
