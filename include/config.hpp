@@ -18,6 +18,12 @@ struct Config {
     float body_stiffness = 1200.0f, interaction_cutoff = 2.0f;
     float wall_strength = 200.0f, wall_range = 0.25f;
     float obstacle_x = -1.0f, obstacle_y = -1.0f, obstacle_radius = 0.0f;
+    float metric_cell_size = 1.0f;
+    float congestion_density_threshold = 2.0f;
+    float congestion_speed_threshold = 0.5f;
+    float high_congestion_seconds = 2.0f;
+    float bottleneck_depth = 2.0f;
+    float bottleneck_margin = 0.5f;
 };
 Config load_config(const std::string& path);
 void validate(const Config& c);

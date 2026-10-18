@@ -69,7 +69,8 @@ host/device state copies, and `total_ms` includes device allocation, launches,
 synchronization, and transfers but excludes CSV writing. Compare these timing
 boundaries explicitly rather than treating unlike totals as a speedup.
 
-Density, speed, congestion thresholds and exit-flow definitions remain owned
-by the shared metrics specification. The visualization's 1 m heatmap grid is
-descriptive only and is not a risk score. All parallel backends must adopt
-the equations, guards and exit rule above before numerical comparison.
+Density, speed, congestion thresholds, bottleneck occupancy, exit flow, and
+risk proxy definitions are in [the metrics specification](metrics_specification.md).
+The visualization's 1 m heatmap grid is descriptive only and is not a risk
+score. All parallel backends must adopt the equations, guards and exit rule
+above before numerical comparison.

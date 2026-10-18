@@ -1,4 +1,4 @@
-"""Compare CPU and CUDA snapshot CSVs from the same simulation scenario."""
+"""Compare snapshot CSVs from two backends of the same scenario."""
 
 import argparse
 import csv
