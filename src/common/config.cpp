@@ -15,6 +15,10 @@ void validate(const Config& c) {
         !positive(c.interaction_strength) || !positive(c.interaction_range) ||
         !positive(c.body_stiffness) || !positive(c.interaction_cutoff) ||
         !positive(c.wall_strength) || !positive(c.wall_range) ||
+        !positive(c.metric_cell_size) || !positive(c.congestion_density_threshold) ||
+        !positive(c.congestion_speed_threshold) || !positive(c.high_congestion_seconds) ||
+        !positive(c.bottleneck_depth) || !std::isfinite(c.bottleneck_margin) ||
+        c.bottleneck_margin < 0 ||
         !std::isfinite(c.exit_center_y) || !std::isfinite(c.obstacle_radius) ||
         c.obstacle_radius < 0 || c.exit_width <= 2 * c.radius ||
         c.exit_center_y - c.exit_width / 2 < 0 ||
@@ -71,6 +75,12 @@ Config load_config(const std::string& path) {
     setf("body_stiffness", c.body_stiffness); setf("interaction_cutoff", c.interaction_cutoff);
     setf("wall_strength", c.wall_strength); setf("wall_range", c.wall_range);
     setf("obstacle_x", c.obstacle_x); setf("obstacle_y", c.obstacle_y); setf("obstacle_radius", c.obstacle_radius);
+    setf("metric_cell_size", c.metric_cell_size);
+    setf("congestion_density_threshold", c.congestion_density_threshold);
+    setf("congestion_speed_threshold", c.congestion_speed_threshold);
+    setf("high_congestion_seconds", c.high_congestion_seconds);
+    setf("bottleneck_depth", c.bottleneck_depth);
+    setf("bottleneck_margin", c.bottleneck_margin);
     if (!values.empty()) throw std::runtime_error("unknown configuration key: " + values.begin()->first);
     validate(c);
     return c;
