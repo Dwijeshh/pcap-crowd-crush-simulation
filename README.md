@@ -39,6 +39,9 @@ against the sequential reference on an RTX 3050; see
 and results. OpenMP, MPI, hybrid integration, and shared risk metrics are still
 team work.
 
+Sammit's controlled CPU/CUDA measurements, block-size tuning, and performance
+plots are in [the benchmark report](docs/sammit_benchmarks.md).
+
 ## Build and run
 
 ```sh
@@ -60,6 +63,11 @@ prefix. Create the parent directory first. All visualization and CSV writing
 occurs outside the CPU update timer. Use identical scenario files and seeds
 when comparing backends. See [the model specification](docs/model_specification.md)
 for equations and timing definitions.
+
+For the CPU/CUDA benchmark, run `scripts/benchmark_cuda.py` with `--cpu` and
+`--cuda` pointing to Release executables. It performs a warm-up and five
+measured repetitions per case, then writes raw runs, summary statistics and
+SVG plots.
 
 ## Development order
 

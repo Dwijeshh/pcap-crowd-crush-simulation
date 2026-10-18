@@ -63,11 +63,13 @@ The configuration parser rejects duplicate/unknown keys and invalid geometry.
 The snapshot CSV schema is `step,time,id,x,y,vx,vy,preferred_speed,radius,active`.
 The summary CSV schema is `step,time,active,exited,simulation_ms`; its rows
 match snapshot intervals and the final step. The run CSV contains backend,
-configuration identifiers, and timing components. CPU `simulation_ms` sums
-only update calls. CUDA `kernel_ms` uses CUDA events, `transfer_ms` times
-host/device state copies, and `total_ms` includes device allocation, launches,
-synchronization, and transfers but excludes CSV writing. Compare these timing
-boundaries explicitly rather than treating unlike totals as a speedup.
+configuration identifiers, and timing components. CPU summary `simulation_ms`
+sums only update calls; CPU run `total_ms` also includes allocation of the next
+state buffer. CUDA `kernel_ms` uses CUDA events, `transfer_ms` times host/device
+state copies, and CUDA `total_ms` includes device allocation, launches,
+synchronization, and transfers. Both `total_ms` values exclude initial state
+generation, configuration parsing, and CSV writing. The CPU/GPU benchmark uses
+these run-level `total_ms` values for compute speedup.
 
 Density, speed, congestion thresholds and exit-flow definitions remain owned
 by the shared metrics specification. The visualization's 1 m heatmap grid is
