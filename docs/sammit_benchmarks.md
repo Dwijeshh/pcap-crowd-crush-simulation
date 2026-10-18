@@ -30,8 +30,7 @@ short scaling runs, and 26, 44, and 52 exits for widths 1, 2, and 4 m. The
 zero exits in scaling runs reflect the large fixed room and short 2 s simulated
 duration; that study measures compute scaling, while the exit-width study
 measures the bottleneck scenarios. Detailed snapshot comparisons for the
-100-person scenarios and a 5,000-person pilot are in `cuda_validation.md` and
-the 5,000-person pilot documented there.
+100-person scenarios and a 5,000-person pilot are in `cuda_validation.md`.
 
 ## Scaling results
 
