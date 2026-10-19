@@ -173,7 +173,8 @@ def performance(args):
         for row in read_rows(path):
             identity = tuple((key, value) for key, value in row.items()
                              if key not in ("backend", "pedestrians", "hardware_threads", "device_name",
-                                            "total_ms", "kernel_ms", "transfer_ms"))
+                                            "total_ms", "kernel_ms", "transfer_ms",
+                                            "worker_threads", "metrics_ms"))
             if scenario is None:
                 scenario = identity
             elif scenario != identity:

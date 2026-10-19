@@ -5,9 +5,13 @@ Compare positions/velocities after one step and short runs across backends.
 Check exited counts, cell metrics, uneven MPI partitions and invalid numeric values.
 Document absolute/relative tolerances and test time-step stability.
 
-`compare_snapshots.py` compares sequential and CUDA snapshot CSVs for the same
+`compare_snapshots.py` compares snapshot CSVs from two backends for the same
 scenario. It requires identical step, agent ID, and active state, and a maximum
 absolute difference of 0.001 for each position and velocity component by
-default. Run it after both executables finish; see
-[`docs/cuda_validation.md`](../docs/cuda_validation.md) for the commands and
-measured differences on Sammit's GPU.
+default. Use `--abs-tol 0` for exact comparison where appropriate. See
+[OpenMP validation](../docs/openmp_validation.md) and
+[CUDA validation](../docs/cuda_validation.md) for commands and results.
+
+`metrics_tests.cpp` checks grid area, cell density and speed, congestion
+durations, exit flow and empty crowds. `openmp_tests.cpp` checks movement and
+metrics against the sequential backend.

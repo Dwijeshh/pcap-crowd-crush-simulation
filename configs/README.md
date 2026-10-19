@@ -7,3 +7,5 @@ scenarios share the same seed, crowd, force constants and duration, and vary
 only the exit width or obstacle. They support a controlled geometry demo.
 For crowd scaling, enlarge the room or reduce body radius when required to
 fit non-overlapping initial positions; record those changes with results.
+The optional metric keys and their defaults are documented in
+[`docs/metrics_specification.md`](../docs/metrics_specification.md).

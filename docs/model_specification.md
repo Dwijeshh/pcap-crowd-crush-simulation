@@ -71,7 +71,8 @@ synchronization, and transfers. Both `total_ms` values exclude initial state
 generation, configuration parsing, and CSV writing. The CPU/GPU benchmark uses
 these run-level `total_ms` values for compute speedup.
 
-Density, speed, congestion thresholds and exit-flow definitions remain owned
-by the shared metrics specification. The visualization's 1 m heatmap grid is
-descriptive only and is not a risk score. All parallel backends must adopt
-the equations, guards and exit rule above before numerical comparison.
+Density, speed, congestion thresholds, bottleneck occupancy, exit flow, and
+risk proxy definitions are in [the metrics specification](metrics_specification.md).
+The visualization's 1 m heatmap grid is descriptive only and is not a risk
+score. All parallel backends must adopt the equations, guards and exit rule
+above before numerical comparison.

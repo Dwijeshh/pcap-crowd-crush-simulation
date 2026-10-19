@@ -31,13 +31,14 @@ Sammit starts with a verified sequential model. Parallel implementations follow 
 
 ## Current status
 
-Sammit's sequential reference, shared movement kernel, scenario files, and
-dependency-free visualization tools are implemented. CUDA builds automatically
-when CMake detects a CUDA toolkit. Sammit's CUDA path was built and checked
-against the sequential reference on an RTX 3050; see
-[CUDA validation](docs/cuda_validation.md) for reproducible Windows commands
-and results. OpenMP, MPI, hybrid integration, and shared risk metrics are still
-team work.
+The sequential reference, shared movement kernel, OpenMP backend, CPU risk
+indicators, scenario files, and dependency-free visualization tools are
+implemented. CUDA builds automatically when CMake detects a toolkit. See
+[OpenMP validation](docs/openmp_validation.md), the
+[metrics specification](docs/metrics_specification.md), and
+[CUDA validation](docs/cuda_validation.md) for reproducible checks. MPI and
+hybrid integration remain team work. CUDA metric collection has not yet been
+integrated.
 
 Sammit's controlled CPU/CUDA measurements, block-size tuning, and performance
 plots are in [the benchmark report](docs/sammit_benchmarks.md).
@@ -50,6 +51,7 @@ cmake --build build --config Release
 ctest --test-dir build --output-on-failure
 mkdir -p results/tmp
 build/pcap_sequential configs/wide_exit.cfg results/tmp/wide
+build/pcap_openmp configs/wide_exit.cfg results/tmp/wide_openmp 4
 # If CUDA was detected:
 build/pcap_cuda configs/wide_exit.cfg results/tmp/wide_cuda 256
 python scripts/visualize.py animate configs/wide_exit.cfg results/tmp/wide_snapshots.csv results/tmp/wide.html
@@ -59,10 +61,12 @@ python scripts/visualize.py timeseries configs/wide_exit.cfg results/tmp/wide_sn
 
 On multi-configuration generators, executables may be under `build/Release/`.
 Each run writes `_snapshots.csv`, `_summary.csv` and `_run.csv` at the output
-prefix. Create the parent directory first. All visualization and CSV writing
-occurs outside the CPU update timer. Use identical scenario files and seeds
-when comparing backends. See [the model specification](docs/model_specification.md)
-for equations and timing definitions.
+prefix. Sequential and OpenMP runs also write `_metrics.csv` and `_cells.csv`.
+Create the parent directory first. CPU movement and metric sampling have
+separate timers; CSV writing is outside both. Use identical scenario files and
+seeds when comparing backends. See
+[the model specification](docs/model_specification.md) for equations and
+timing definitions.
 
 For the CPU/CUDA benchmark, run `scripts/benchmark_cuda.py` with `--cpu` and
 `--cuda` pointing to Release executables. It performs a warm-up and five
