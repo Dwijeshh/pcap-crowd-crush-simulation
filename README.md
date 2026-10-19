@@ -2,13 +2,13 @@
 
 PCAP team project comparing sequential CPU, OpenMP, MPI, CUDA, and hybrid MPI + OpenMP + CUDA execution of the same pedestrian simulation.
 
-## Team responsibilities
+## Contributions
 
-| Member | Responsibility |
+| Member | Completed work |
 | --- | --- |
-| Sammit Menon | Shared movement model, sequential baseline, CUDA, visualization |
-| Dwijesh P | OpenMP, risk indicators, correctness comparisons |
-| Ayush KL | MPI, build setup, hybrid integration, benchmark runner |
+| Sammit Menon | Shared movement model, sequential baseline, CUDA backend, visualization, and CPU/CUDA benchmarks and figures ([#1](https://github.com/Dwijeshh/pcap-crowd-crush-simulation/pull/1), [#2](https://github.com/Dwijeshh/pcap-crowd-crush-simulation/pull/2)) |
+| Dwijesh P | OpenMP backend, shared crowd metrics and risk indicators, correctness comparisons, CUDA metric collection, hybrid backend, and five-backend benchmarking ([#3](https://github.com/Dwijeshh/pcap-crowd-crush-simulation/pull/3), [#5](https://github.com/Dwijeshh/pcap-crowd-crush-simulation/pull/5)) |
+| Ayush KL | MPI backend, distributed state exchange, MPI tests, and MPI build integration ([#4](https://github.com/Dwijeshh/pcap-crowd-crush-simulation/pull/4)) |
 
 The parallel backends use Sammit's shared sequential movement rule.
 
