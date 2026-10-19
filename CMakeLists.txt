@@ -45,3 +45,23 @@ if(BUILD_TESTING)
         add_test(NAME openmp COMMAND pcap_openmp_tests)
     endif()
 endif()
+
+find_package(MPI COMPONENTS CXX)
+if(MPI_CXX_FOUND)
+    add_library(pcap_mpi_backend src/mpi/simulation.cpp)
+    target_link_libraries(pcap_mpi_backend PUBLIC pcap_common MPI::MPI_CXX)
+endif()
+
+if(MPI_CXX_FOUND)
+    add_executable(pcap_mpi src/mpi/main.cpp)
+    target_link_libraries(pcap_mpi PRIVATE pcap_mpi_backend)
+    if(BUILD_TESTING)
+        add_executable(pcap_mpi_tests tests/mpi_tests.cpp)
+        target_link_libraries(pcap_mpi_tests PRIVATE pcap_mpi_backend)
+        foreach(ranks 1 2 4)
+            add_test(NAME mpi_${ranks}_ranks
+                     COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${ranks}
+                             $<TARGET_FILE:pcap_mpi_tests>)
+        endforeach()
+    endif()
+endif()
