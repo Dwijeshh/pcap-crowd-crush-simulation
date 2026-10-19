@@ -40,6 +40,9 @@ implemented. CUDA builds automatically when CMake detects a toolkit. See
 hybrid integration remain team work. CUDA metric collection has not yet been
 integrated.
 
+Sammit's controlled CPU/CUDA measurements, block-size tuning, and performance
+plots are in [the benchmark report](docs/sammit_benchmarks.md).
+
 ## Build and run
 
 ```sh
@@ -64,6 +67,11 @@ separate timers; CSV writing is outside both. Use identical scenario files and
 seeds when comparing backends. See
 [the model specification](docs/model_specification.md) for equations and
 timing definitions.
+
+For the CPU/CUDA benchmark, run `scripts/benchmark_cuda.py` with `--cpu` and
+`--cuda` pointing to Release executables. It performs a warm-up and five
+measured repetitions per case, then writes raw runs, summary statistics and
+SVG plots.
 
 ## Development order
 

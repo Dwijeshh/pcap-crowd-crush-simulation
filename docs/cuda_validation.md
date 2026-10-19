@@ -39,6 +39,12 @@ The wide-exit CUDA run also passed at block sizes 128, 256, and 512, with
 identical saved GPU states and the same 52 exited agents. The comparator was
 checked against mismatched scenario files and returned a failure.
 
+A separate 5,000-person, 10-step pilot in a 100 × 70 m room also compared
+10,000 saved CPU/GPU rows (initial and final). Active states matched; maximum
+absolute differences were 0.0000039 m in x, 0.0000038 m in y,
+0.000002563 m/s in vx, and 0.000000804 m/s in vy, all below 0.001.
+
 These are correctness checks, not a performance benchmark. The 100-agent
-scenarios are too small to establish a GPU speedup, and the CPU and CUDA timing
-fields cover different work. See `model_specification.md` for timing boundaries.
+scenarios are too small to establish a GPU speedup. The earlier CPU build
+reported update-only timing; later CPU/CUDA results use aligned run-level
+compute totals. See `sammit_benchmarks.md` and `model_specification.md`.

@@ -15,7 +15,10 @@ int main(int argc, char** argv) {
     try {
         const auto c = pcap::load_config(argv[1]);
         auto current = pcap::initialize(c);
+        const auto allocation_start = std::chrono::steady_clock::now();
         pcap::State next(current.size());
+        double total_ms = std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - allocation_start).count();
         pcap::Output output(argv[2], c, "sequential");
         pcap::MetricsTracker metrics(c);
         pcap::MetricsOutput metrics_output(argv[2], c, metrics);
@@ -27,7 +30,9 @@ int main(int argc, char** argv) {
             const auto start = std::chrono::steady_clock::now();
             pcap::step(current, next, c);
             const auto end = std::chrono::steady_clock::now();
-            elapsed_ms += std::chrono::duration<double, std::milli>(end - start).count();
+            const double step_ms = std::chrono::duration<double, std::milli>(end - start).count();
+            elapsed_ms += step_ms;
+            total_ms += step_ms;
             std::swap(current, next);
             const auto metrics_start = std::chrono::steady_clock::now();
             metrics.sample(current, t);
@@ -40,7 +45,8 @@ int main(int argc, char** argv) {
         }
         output.finish(elapsed_ms, 0, 0, "cpu", 1, metrics_ms);
         std::cout << "sequential: " << c.pedestrians - pcap::active_count(current)
-                  << '/' << c.pedestrians << " exited; simulation_ms=" << elapsed_ms << '\n';
+                  << '/' << c.pedestrians << " exited; total_ms=" << total_ms
+                  << "; simulation_ms=" << elapsed_ms << '\n';
         return 0;
     } catch (const std::exception& e) {
         std::cerr << "error: " << e.what() << '\n';
