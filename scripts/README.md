@@ -13,3 +13,10 @@ divided by time between snapshots. These are descriptive simulation metrics,
 not calibrated physical risk indicators. Use repeated benchmark runs and
 reported medians for publication-quality performance plots; a single run is
 only a smoke test. Ayush owns the experiment runner.
+
+`benchmark_cuda.py` repeats sequential/CUDA block-size runs.
+`benchmark_backends.py` runs the five available backends on the crowd-size
+and exit-width matrix, writes raw/summary CSVs and three SVG figures, and
+checks that exited counts agree. It needs paths to the built executables and
+an MPI launcher. See [hybrid validation](../docs/hybrid_validation.md) for
+the recorded hardware and results.

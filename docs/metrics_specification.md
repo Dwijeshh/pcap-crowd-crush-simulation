@@ -1,7 +1,7 @@
 # Shared simulation metrics
 
-The sequential and OpenMP executables calculate these metrics from the same
-post-update state at every time step, including step zero. They write a summary
+All five backends calculate these metrics from their post-update state at
+every time step, including step zero. They write a summary
 at step zero, each snapshot interval, and the final step. These values are
 simulation indicators, not calibrated predictions of injury or crush risk.
 
@@ -58,9 +58,10 @@ parameters. `P_cells.csv` has one row per grid cell at each recorded step with
 count, actual area, density, mean speed, congestion flag and durations. The
 usual `P_snapshots.csv` and `P_summary.csv` keep their existing formats.
 `P_run.csv` adds the metric parameters, `worker_threads`, and `metrics_ms`.
-The latter measures metric sampling only; CPU `total_ms` still measures
-movement updates. CSV writing is outside both timers.
-
-CUDA currently writes the run metadata fields but does not produce the metric
-or cell CSVs. A cross-backend metric comparison requires applying this same
-definition to its states or adding equivalent CUDA metric collection.
+The latter measures metric sampling separately from movement. CUDA's
+`metrics_ms` also includes the state downloads needed for host metric
+sampling. Its optional `--no-metrics` mode omits metric and cell CSVs for
+movement-only benchmarking. Hybrid computes range-local values with OpenMP
+and combines them across ranks with MPI. CSV writing is outside both timers.
+CPU and GPU positions can differ slightly; a pedestrian near a cell edge can
+therefore land in adjacent cells even when the snapshot comparison passes.

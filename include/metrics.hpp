@@ -26,11 +26,22 @@ struct MetricsSnapshot {
     std::vector<CellMetrics> cells;
 };
 
+struct MetricAccumulator {
+    std::vector<int> counts;
+    std::vector<double> speed_sums;
+    int active = 0, bottleneck = 0, invalid = 0;
+    double total_speed = 0;
+};
+
 class MetricsTracker {
 public:
     explicit MetricsTracker(const Config& config);
     // Call once for step zero and after every subsequent update, not only at snapshots.
     void sample(const State& state, int step, int threads = 1);
+    MetricAccumulator accumulate(const State& state, int first, int last,
+                                 int threads = 1) const;
+    // Complete one step from already combined rank-local accumulators.
+    void sample_aggregate(const MetricAccumulator& aggregate, int pedestrians, int step);
     MetricsSnapshot output();
     int columns() const { return columns_; }
     int rows() const { return rows_; }

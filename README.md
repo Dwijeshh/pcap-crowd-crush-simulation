@@ -10,7 +10,7 @@ PCAP team project comparing sequential CPU, OpenMP, MPI, CUDA, and hybrid MPI + 
 | Dwijesh P | OpenMP, risk indicators, correctness comparisons |
 | Ayush KL | MPI, build setup, hybrid integration, benchmark runner |
 
-Sammit starts with a verified sequential model. Parallel implementations follow that reference.
+The parallel backends use Sammit's shared sequential movement rule.
 
 ## Project layout
 
@@ -31,19 +31,27 @@ Sammit starts with a verified sequential model. Parallel implementations follow 
 
 ## Current status
 
-The sequential reference, shared movement kernel, OpenMP backend, CPU risk
-indicators, scenario files, and dependency-free visualization tools are
-implemented. CUDA builds automatically when CMake detects a toolkit. See
-[OpenMP validation](docs/openmp_validation.md), the
-[metrics specification](docs/metrics_specification.md), and
-[CUDA validation](docs/cuda_validation.md) for reproducible checks. MPI and
-hybrid integration remain team work. CUDA metric collection has not yet been
-integrated.
+Sequential, OpenMP, MPI, CUDA, and hybrid MPI + OpenMP + CUDA executables are
+implemented. CMake builds OpenMP, MPI, CUDA, and hybrid targets when their
+dependencies are available. All backends write the shared crowd metrics;
+CUDA can disable metric collection with `--no-metrics` for movement-only
+benchmarking. The metrics are configurable simulation indicators, not
+calibrated physical injury predictions.
 
-Sammit's controlled CPU/CUDA measurements, block-size tuning, and performance
-plots are in [the benchmark report](docs/sammit_benchmarks.md).
+The [metrics specification](docs/metrics_specification.md),
+[hybrid and five-backend validation](docs/hybrid_validation.md),
+[OpenMP validation](docs/openmp_validation.md), and
+[CUDA validation](docs/cuda_validation.md) record definitions and checks.
+Sammit's separate CUDA block-size study is in
+[the CUDA benchmark report](docs/sammit_benchmarks.md).
 
 ## Build and run
+
+Requires CMake and a C++17 compiler. OpenMP support enables `pcap_openmp`;
+an MPI runtime and development SDK enable `pcap_mpi`; a CUDA toolkit enables
+`pcap_cuda`. All three are needed for `pcap_hybrid`. On Windows, Microsoft MPI
+and MSVC with CUDA integration are supported. CMake skips unavailable
+optional backends.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -52,26 +60,35 @@ ctest --test-dir build --output-on-failure
 mkdir -p results/tmp
 build/pcap_sequential configs/wide_exit.cfg results/tmp/wide
 build/pcap_openmp configs/wide_exit.cfg results/tmp/wide_openmp 4
+# If MPI was detected:
+mpiexec -n 2 build/pcap_mpi configs/wide_exit.cfg results/tmp/wide_mpi
 # If CUDA was detected:
 build/pcap_cuda configs/wide_exit.cfg results/tmp/wide_cuda 256
+# If MPI, OpenMP and CUDA were all detected:
+mpiexec -n 2 build/pcap_hybrid configs/wide_exit.cfg results/tmp/wide_hybrid 256 2
 python scripts/visualize.py animate configs/wide_exit.cfg results/tmp/wide_snapshots.csv results/tmp/wide.html
 python scripts/visualize.py heatmap configs/wide_exit.cfg results/tmp/wide_snapshots.csv results/tmp/wide_heatmap.svg
 python scripts/visualize.py timeseries configs/wide_exit.cfg results/tmp/wide_snapshots.csv results/tmp/wide_summary.csv results/tmp/wide
 ```
 
 On multi-configuration generators, executables may be under `build/Release/`.
-Each run writes `_snapshots.csv`, `_summary.csv` and `_run.csv` at the output
-prefix. Sequential and OpenMP runs also write `_metrics.csv` and `_cells.csv`.
-Create the parent directory first. CPU movement and metric sampling have
-separate timers; CSV writing is outside both. Use identical scenario files and
-seeds when comparing backends. See
-[the model specification](docs/model_specification.md) for equations and
-timing definitions.
+Each run writes `_snapshots.csv`, `_summary.csv`, `_run.csv`, `_metrics.csv`,
+and `_cells.csv` at the output prefix. MPI adds `_mpi_timing.csv`; hybrid adds
+`_hybrid_timing.csv`. CUDA `--no-metrics` omits metric and cell files. Create
+the parent directory first. Movement and metric sampling have separate
+timers; CSV writing is outside both. Use identical scenarios and seeds when
+comparing backends. See [the model specification](docs/model_specification.md)
+for equations and timing definitions.
 
 For the CPU/CUDA benchmark, run `scripts/benchmark_cuda.py` with `--cpu` and
 `--cuda` pointing to Release executables. It performs a warm-up and five
 measured repetitions per case, then writes raw runs, summary statistics and
 SVG plots.
+For the five-backend comparison, run `scripts/benchmark_backends.py` with
+paths to the available executables and `--mpiexec`. The committed
+[raw runs, medians, and plots](results/benchmarks/all_backends/summary.csv)
+cover four crowd sizes and three exit widths. The hybrid report explains
+the timing boundaries and one-GPU limitation.
 
 ## Development order
 

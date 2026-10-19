@@ -68,8 +68,11 @@ sums only update calls; CPU run `total_ms` also includes allocation of the next
 state buffer. CUDA `kernel_ms` uses CUDA events, `transfer_ms` times host/device
 state copies, and CUDA `total_ms` includes device allocation, launches,
 synchronization, and transfers. Both `total_ms` values exclude initial state
-generation, configuration parsing, and CSV writing. The CPU/GPU benchmark uses
-these run-level `total_ms` values for compute speedup.
+generation, configuration parsing, and CSV writing. CUDA metric-state
+downloads and host sampling are recorded separately as `metrics_ms` when
+metrics are enabled. The CPU/GPU benchmark uses CUDA `--no-metrics` and
+run-level `total_ms` values for movement-pathway speedup. MPI and hybrid
+timing boundaries are documented in `hybrid_validation.md`.
 
 Density, speed, congestion thresholds, bottleneck occupancy, exit flow, and
 risk proxy definitions are in [the metrics specification](metrics_specification.md).
