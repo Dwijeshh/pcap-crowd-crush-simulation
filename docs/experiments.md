@@ -12,3 +12,8 @@ For CUDA/hybrid, report CPU/GPU resources; CUDA threads are not equivalent CPU c
 
 Initial matrix: crowds 500/1000/2000/5000 if practical; exits 1/2/4 m;
 OpenMP threads 1/2/4/8; MPI ranks 1/2/4; CUDA blocks 128/256/512 where supported.
+
+The completed five-backend local benchmark and its timing limits are in
+[`hybrid_validation.md`](hybrid_validation.md). Raw runs, summaries and plots
+are in `results/benchmarks/all_backends/`. The separate CUDA block-size study
+is in `sammit_benchmarks.md`.

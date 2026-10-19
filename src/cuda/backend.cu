@@ -45,6 +45,18 @@ void DeviceState::download(State& s) const {
     DOWNLOAD(preferred_speed, float); DOWNLOAD(radius, float); DOWNLOAD(active, std::uint8_t);
 #undef DOWNLOAD
 }
+void DeviceState::download_range(State& s, int first, int last) const {
+    if (s.size() != n_ || first < 0 || last < first ||
+        static_cast<std::size_t>(last) > n_)
+        throw std::invalid_argument("device download range mismatch");
+    const std::size_t count = static_cast<std::size_t>(last - first);
+    if (!count) return;
+#define DOWNLOAD_RANGE(field, type) check(cudaMemcpy(s.field.data() + first, field##_ + first, count * sizeof(type), cudaMemcpyDeviceToHost), "download " #field)
+    DOWNLOAD_RANGE(x, float); DOWNLOAD_RANGE(y, float);
+    DOWNLOAD_RANGE(vx, float); DOWNLOAD_RANGE(vy, float);
+    DOWNLOAD_RANGE(active, std::uint8_t);
+#undef DOWNLOAD_RANGE
+}
 ConstStateView DeviceState::read_view() const {
     return {x_, y_, vx_, vy_, preferred_speed_, radius_, active_};
 }

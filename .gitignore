@@ -79,5 +79,6 @@ venv/
 
 # Temporary simulation outputs
 results/tmp/
+results/benchmarks/all_backends/.working/
 results/samples/*_snapshots.csv
 results/samples/*_summary.csv

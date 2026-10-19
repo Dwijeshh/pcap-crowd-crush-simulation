@@ -15,3 +15,8 @@ default. Use `--abs-tol 0` for exact comparison where appropriate. See
 `metrics_tests.cpp` checks grid area, cell density and speed, congestion
 durations, exit flow and empty crowds. `openmp_tests.cpp` checks movement and
 metrics against the sequential backend.
+`mpi_tests.cpp` checks 1, 2 and 4 ranks, including uneven and empty rank
+partitions. `compare_metrics.py` compares metric summary and cell CSVs; use
+`--summary-only` when small CPU/GPU position differences cross a cell edge.
+See [hybrid validation](../docs/hybrid_validation.md) for the five-backend
+correctness results.

@@ -22,6 +22,8 @@ struct MpiTiming {
 };
 
 MpiLayout make_layout(int pedestrians, MPI_Comm comm = MPI_COMM_WORLD);
+void gather_updated_state(State& next, const MpiLayout& layout,
+                          MPI_Comm comm = MPI_COMM_WORLD);
 
 // `next` must start as a copy of `current` so constant fields are present
 // for pedestrians owned by other ranks.

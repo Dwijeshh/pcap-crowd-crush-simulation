@@ -31,8 +31,15 @@ double MetricsTracker::cell_area(int column, int row) const {
 }
 
 void MetricsTracker::sample(const State& state, int step, int threads) {
-    if (step != last_step_ + 1 || threads < 1)
-        throw std::invalid_argument("metrics require consecutive steps and positive thread count");
+    sample_aggregate(accumulate(state, 0, static_cast<int>(state.size()), threads),
+                     static_cast<int>(state.size()), step);
+}
+
+MetricAccumulator MetricsTracker::accumulate(const State& state, int first, int last,
+                                             int threads) const {
+    if (first < 0 || last < first || static_cast<std::size_t>(last) > state.size() ||
+        threads < 1)
+        throw std::invalid_argument("invalid metric range or thread count");
     const std::size_t cells = consecutive_.size();
     const int workers =
 #ifdef _OPENMP
@@ -51,7 +58,7 @@ void MetricsTracker::sample(const State& state, int step, int threads) {
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static) num_threads(workers) reduction(+:active,bottleneck,invalid,total_speed)
 #endif
-    for (int i = 0; i < static_cast<int>(state.size()); ++i) {
+    for (int i = first; i < last; ++i) {
         if (!state.active[i]) continue;
         const double x = state.x[i], y = state.y[i];
         const double speed = std::hypot(double(state.vx[i]), double(state.vy[i]));
@@ -74,27 +81,46 @@ void MetricsTracker::sample(const State& state, int step, int threads) {
         if (x >= config_.room_width - config_.bottleneck_depth && y >= lower && y <= upper)
             ++bottleneck;
     }
-    if (invalid) throw std::runtime_error("active pedestrian has invalid position or speed");
+    MetricAccumulator result;
+    result.counts.resize(cells);
+    result.speed_sums.resize(cells);
+    result.active = active;
+    result.bottleneck = bottleneck;
+    result.invalid = invalid;
+    result.total_speed = total_speed;
+    for (std::size_t k = 0; k < cells; ++k) {
+        for (int worker = 0; worker < workers; ++worker) {
+            result.counts[k] += counts[worker][k];
+            result.speed_sums[k] += speed_sums[worker][k];
+        }
+    }
+    return result;
+}
+
+void MetricsTracker::sample_aggregate(const MetricAccumulator& aggregate,
+                                      int pedestrians, int step) {
+    if (step != last_step_ + 1 || pedestrians < 0 ||
+        aggregate.counts.size() != consecutive_.size() ||
+        aggregate.speed_sums.size() != consecutive_.size() ||
+        aggregate.active < 0 || aggregate.active > pedestrians)
+        throw std::invalid_argument("invalid or nonconsecutive metric aggregate");
+    if (aggregate.invalid) throw std::runtime_error("active pedestrian has invalid position or speed");
 
     latest_.step = step;
     latest_.time = double(step) * config_.dt;
-    latest_.active = active;
-    latest_.exited = static_cast<int>(state.size()) - active;
-    latest_.bottleneck_occupancy = bottleneck;
+    latest_.active = aggregate.active;
+    latest_.exited = pedestrians - aggregate.active;
+    latest_.bottleneck_occupancy = aggregate.bottleneck;
     latest_.congested_cells = 0;
     latest_.peak_density = 0;
-    latest_.average_speed = active ? total_speed / active : 0;
+    latest_.average_speed = aggregate.active ? aggregate.total_speed / aggregate.active : 0;
     latest_.max_consecutive_seconds = 0;
     latest_.max_cumulative_seconds = 0;
     latest_.risk_category = "low";
-    for (std::size_t k = 0; k < cells; ++k) {
+    for (std::size_t k = 0; k < consecutive_.size(); ++k) {
         auto& cell = latest_.cells[k];
-        int count = 0;
-        double sum = 0;
-        for (int worker = 0; worker < workers; ++worker) {
-            count += counts[worker][k];
-            sum += speed_sums[worker][k];
-        }
+        const int count = aggregate.counts[k];
+        const double sum = aggregate.speed_sums[k];
         const int column = static_cast<int>(k % columns_);
         const int row = static_cast<int>(k / columns_);
         cell.count = count;

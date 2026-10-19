@@ -52,6 +52,13 @@ if(MPI_CXX_FOUND)
     target_link_libraries(pcap_mpi_backend PUBLIC pcap_common MPI::MPI_CXX)
 endif()
 
+if(MPI_CXX_FOUND AND OpenMP_CXX_FOUND AND CMAKE_CUDA_COMPILER)
+    find_package(CUDAToolkit REQUIRED)
+    add_executable(pcap_hybrid src/hybrid/main.cpp)
+    target_link_libraries(pcap_hybrid PRIVATE pcap_mpi_backend pcap_cuda_backend
+                          OpenMP::OpenMP_CXX CUDA::cudart)
+endif()
+
 if(MPI_CXX_FOUND)
     add_executable(pcap_mpi src/mpi/main.cpp)
     target_link_libraries(pcap_mpi PRIVATE pcap_mpi_backend)

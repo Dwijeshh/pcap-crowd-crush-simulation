@@ -47,6 +47,7 @@ def run(executable, config, prefix, block=None):
     command = [str(executable), str(config), str(prefix)]
     if block is not None:
         command.append(str(block))
+        command.append("--no-metrics")
     try:
         subprocess.run(command, capture_output=True, text=True, timeout=180, check=True)
         metadata = read_one(Path(str(prefix) + "_run.csv"))

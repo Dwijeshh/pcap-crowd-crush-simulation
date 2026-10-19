@@ -31,6 +31,18 @@ void gather_bytes(std::vector<std::uint8_t>& a, const MpiLayout& layout, MPI_Com
 }
 } // namespace
 
+void gather_updated_state(State& next, const MpiLayout& layout, MPI_Comm comm) {
+    const int n = static_cast<int>(next.size());
+    if (layout.displs.empty() ||
+        layout.displs.back() + layout.counts.back() != n)
+        throw std::invalid_argument("MPI layout does not match the pedestrian count");
+    gather_floats(next.x, layout, comm);
+    gather_floats(next.y, layout, comm);
+    gather_floats(next.vx, layout, comm);
+    gather_floats(next.vy, layout, comm);
+    gather_bytes(next.active, layout, comm);
+}
+
 void step_mpi(const State& current, State& next, const Config& config,
               const MpiLayout& layout, MpiTiming* timing, MPI_Comm comm) {
     if (current.size() != next.size()) throw std::invalid_argument("state buffer sizes differ");
@@ -38,20 +50,12 @@ void step_mpi(const State& current, State& next, const Config& config,
     if (layout.displs.empty() ||
         layout.displs.back() + layout.counts.back() != n)
         throw std::invalid_argument("MPI layout does not match the pedestrian count");
-
     const ConstStateView cur = view(current);
     const StateView nxt = view(next);
-
     const double t0 = MPI_Wtime();
     for (int i = layout.begin(); i < layout.end(); ++i) update_one(i, n, cur, nxt, config);
     const double t1 = MPI_Wtime();
-
-    // Share every rank's updated slice so all ranks hold the full next state.
-    gather_floats(next.x, layout, comm);
-    gather_floats(next.y, layout, comm);
-    gather_floats(next.vx, layout, comm);
-    gather_floats(next.vy, layout, comm);
-    gather_bytes(next.active, layout, comm);
+    gather_updated_state(next, layout, comm);
     const double t2 = MPI_Wtime();
 
     if (timing) {

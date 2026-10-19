@@ -19,6 +19,7 @@ public:
     DeviceState& operator=(DeviceState&&) = delete;
     void upload(const State& host);
     void download(State& host) const;
+    void download_range(State& host, int first, int last) const;
     ConstStateView read_view() const;
     StateView write_view() const;
     std::size_t size() const { return n_; }
