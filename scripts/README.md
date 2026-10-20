@@ -21,3 +21,10 @@ and exit-width matrix, writes raw/summary CSVs and three SVG figures, and
 checks that exited counts agree. It needs paths to the built executables and
 an MPI launcher. See [hybrid validation](../docs/hybrid_validation.md) for
 the recorded hardware and results.
+
+`live_compare.py` opens a Tkinter window with a pedestrian-count input and
+runs all five built executables concurrently. It reads snapshots while each
+process is running, with no playback clock. Its wall times include launch and
+output overhead; the executables' reported times use their own timing scopes.
+Run `python scripts/live_compare.py --build-dir build-all` from the repo root.
+Use `--headless --pedestrians 1000` to run the same comparison without a window.

@@ -89,6 +89,21 @@ is stretched for viewing and replays completed runs. Single-run timing
 boundaries differ by backend, so use the repeated benchmark results for
 performance claims.
 
+For a live comparison, build all five executables and run:
+
+```powershell
+python scripts\live_compare.py --build-dir build-all
+```
+
+Enter the number of pedestrians (1–5,000) and click **Run all five**. The
+desktop window launches five independent processes, draws each backend's
+snapshots as they arrive, and shows its actual wall-clock completion time and
+reported backend time. The room and exit scale with crowd size to keep initial
+density comparable. At 100 pedestrians some runs finish before the first
+screen refresh; the default of 2,000 makes progress easier to see. Concurrent runs share
+CPU and GPU resources, so use the repeated benchmark results for fair speed
+comparisons.
+
 On multi-configuration generators, executables may be under `build/Release/`.
 Each run writes `_snapshots.csv`, `_summary.csv`, `_run.csv`, `_metrics.csv`,
 and `_cells.csv` at the output prefix. MPI adds `_mpi_timing.csv`; hybrid adds
