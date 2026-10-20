@@ -81,8 +81,13 @@ python scripts/visualize.py compare configs/wide_exit.cfg \
   results/tmp/hybrid_snapshots.csv results/tmp/comparison.html
 ```
 
-Open `results/tmp/comparison.html` in a browser. This is a replay of saved
-snapshots at matching simulation steps; it does not run five processes at once.
+Open `results/tmp/comparison.html` in a browser. **Model time** keeps all five
+panels on the same simulation step. **Compute time** advances each panel
+independently using cumulative `simulation_ms` from its matching `_summary.csv`;
+the page also shows `_run.csv` timing and speedup versus sequential. Playback
+is stretched for viewing and replays completed runs. Single-run timing
+boundaries differ by backend, so use the repeated benchmark results for
+performance claims.
 
 On multi-configuration generators, executables may be under `build/Release/`.
 Each run writes `_snapshots.csv`, `_summary.csv`, `_run.csv`, `_metrics.csv`,

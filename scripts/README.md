@@ -3,7 +3,7 @@
 `visualize.py` uses only Python's standard library:
 
 - `animate CONFIG SNAPSHOTS OUTPUT.html` makes an interactive, standalone crowd animation.
-- `compare CONFIG SEQUENTIAL.csv OPENMP.csv MPI.csv CUDA.csv HYBRID.csv OUTPUT.html` makes a synchronized five-panel replay from runs with matching snapshot steps and times.
+- `compare CONFIG SEQUENTIAL_snapshots.csv OPENMP_snapshots.csv MPI_snapshots.csv CUDA_snapshots.csv HYBRID_snapshots.csv OUTPUT.html` makes a five-panel replay with model-time and independent compute-time views. Each input needs matching `_summary.csv` and `_run.csv` files with the same prefix.
 - `heatmap CONFIG SNAPSHOTS OUTPUT.svg [--step N] [--cell METRES]` makes a density heatmap.
 - `timeseries CONFIG SNAPSHOTS SUMMARY OUTPUT_PREFIX [--cell METRES]` makes peak-density and exit-flow charts.
 - `performance OUTPUT_PREFIX RUN.csv...` makes runtime versus crowd size and, when a sequential reference and parallel result share a crowd size, speedup charts.
