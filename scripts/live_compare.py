@@ -46,7 +46,10 @@ class LiveRun:
         self.history = []
         self.total_ms = None
         self.metrics_ms = None
+        self.update_ms = None
         self._stream = None
+        self._summary_stream = None
+        self._summary_pending = ""
         self._pending = ""
         self._frame = []
         self._frame_step = None
@@ -55,6 +58,16 @@ class LiveRun:
         self._rows = 0
 
     def poll(self):
+        summary_path = Path(str(self.prefix) + "_summary.csv")
+        if self._summary_stream is None and summary_path.exists():
+            self._summary_stream = summary_path.open(encoding="utf-8", newline="")
+        if self._summary_stream is not None:
+            self._summary_pending += self._summary_stream.read()
+            summary_lines = self._summary_pending.split("\n")
+            self._summary_pending = summary_lines.pop()
+            for line in summary_lines:
+                if line and not line.startswith("step,"):
+                    self.update_ms = float(line.split(",")[4])
         path = Path(str(self.prefix) + "_snapshots.csv")
         if self._stream is None and path.exists():
             self._stream = path.open(encoding="utf-8", newline="")
@@ -76,7 +89,8 @@ class LiveRun:
                     self._frame.append((float(fields[3]), float(fields[4]), active))
                 self._rows += 1
                 if self._rows == self.pedestrians:
-                    self.latest = (step, float(fields[1]), self._frame, self._active)
+                    self.latest = (step, float(fields[1]), self._frame,
+                                   self._active, self.wall_seconds)
                     self.history.append(self.latest)
                     self._frame = []
         if self.ended is None and self.process.poll() is not None:
@@ -107,6 +121,8 @@ class LiveRun:
                 self.process.wait()
         if self._stream is not None:
             self._stream.close()
+        if self._summary_stream is not None:
+            self._summary_stream.close()
 
 
 class LiveSession:
@@ -160,9 +176,69 @@ class LiveSession:
             run.close()
 
 
+class PlaybackCursor:
+    """Select a recorded frame without changing the running backend."""
+
+    def __init__(self):
+        self.follow = True
+        self.index = 0
+
+    def selected(self, length):
+        if length and self.follow:
+            self.index = length - 1
+        return self.index
+
+    def pause(self, length):
+        self.selected(length)
+        self.follow = False
+
+    def live(self):
+        self.follow = True
+
+    def seek(self, index, length):
+        if length:
+            self.index = min(length - 1, max(0, round(float(index))))
+            self.follow = False
+
+    def move(self, direction, length):
+        self.seek(self.selected(length) + direction, length)
+
+
+def draw_progress_chart(canvas, runs, pedestrians):
+    """Plot the five observed evacuation curves as new snapshots arrive."""
+    canvas.delete("all")
+    width, height = 1270, 240
+    left, top, right, bottom = 58, 25, width - 20, height - 43
+    xmax = max((run.latest[4] for run in runs.values() if run.latest), default=1)
+    xmax = max(1, xmax)
+    canvas.create_rectangle(left, top, right, bottom, fill="#f7fbfd", outline="#c6d6df")
+    for fraction in (0, 0.25, 0.5, 0.75, 1):
+        y = bottom - fraction * (bottom - top)
+        canvas.create_line(left, y, right, y, fill="#dce7ed")
+        canvas.create_text(left - 8, y, text=str(round(pedestrians * fraction)), anchor="e")
+    for fraction in (0, 0.25, 0.5, 0.75, 1):
+        x = left + fraction * (right - left)
+        canvas.create_line(x, top, x, bottom, fill="#e7eef2")
+        canvas.create_text(x, bottom + 12, text=f"{xmax * fraction:.0f}", anchor="n")
+    canvas.create_text((left + right) / 2, height - 5,
+                       text="Observed wall time since each backend started (seconds)")
+    canvas.create_text(12, (top + bottom) / 2, text="Exited", angle=90)
+    for name in NAMES:
+        run = runs[name]
+        if not run.history:
+            continue
+        points = []
+        for frame in run.history:
+            points.extend((left + frame[4] / xmax * (right - left),
+                           bottom - (pedestrians - frame[3]) / pedestrians * (bottom - top)))
+        if len(points) >= 4:
+            canvas.create_line(*points, fill=COLORS[name], width=2)
+        canvas.create_oval(points[-2] - 4, points[-1] - 4, points[-2] + 4,
+                           points[-1] + 4, fill=COLORS[name], outline="white")
+
+
 def draw_room(canvas, frame, settings, color):
     canvas.delete("all")
-    width, height = 420, 260
     left, top, room_w, room_h = 20, 20, 380, 220
     sx = lambda x: left + x / settings["room_width"] * room_w
     sy = lambda y: top + room_h - y / settings["room_height"] * room_h
@@ -194,67 +270,119 @@ def run_gui(build_dir, pedestrians):
 
     root = tk.Tk()
     root.title("PCAP live five-backend simulation")
-    root.geometry("1380x980")
-    outer = ttk.Frame(root, padding=14)
+    root.geometry("1380x900")
+    root.minsize(720, 500)
+    outer = ttk.Frame(root, padding=12)
     outer.pack(fill="both", expand=True)
     ttk.Label(outer, text="Live five-backend simulation", font=("Segoe UI", 18, "bold")).pack(anchor="w")
-    ttk.Label(outer, text="Each panel follows its process at actual wall-clock speed. Seek, Back and Forward inspect recorded frames while the process keeps running; Live returns to the newest frame. Concurrent runs share CPU and GPU resources; use the benchmark script for fair speed measurements.",
-              wraplength=1250).pack(anchor="w", pady=(5, 12))
+    ttk.Label(outer, text="All five processes run independently. Pause freezes only a panel's view; seek, Back and Forward inspect recorded frames. Live resumes the newest frame. The chart adds each backend's snapshots as they arrive.",
+              wraplength=1200).pack(anchor="w", pady=(5, 8))
     controls = ttk.Frame(outer)
-    controls.pack(fill="x", pady=(0, 12))
+    controls.pack(fill="x", pady=(0, 8))
     ttk.Label(controls, text="Number of pedestrians:").pack(side="left")
     count = tk.StringVar(value=str(pedestrians))
     ttk.Spinbox(controls, from_=1, to=5000, textvariable=count, width=9).pack(side="left", padx=8)
     session = [None]
     completed = [False]
     cards = {}
-    board = ttk.Frame(outer)
-    board.pack(fill="both", expand=True)
+
+    scroll_area = ttk.Frame(outer)
+    scroll_area.pack(fill="both", expand=True)
+    scroller = tk.Canvas(scroll_area, highlightthickness=0)
+    yscroll = ttk.Scrollbar(scroll_area, orient="vertical", command=scroller.yview)
+    xscroll = ttk.Scrollbar(scroll_area, orient="horizontal", command=scroller.xview)
+    scroller.configure(yscrollcommand=yscroll.set, xscrollcommand=xscroll.set)
+    scroller.grid(row=0, column=0, sticky="nsew")
+    yscroll.grid(row=0, column=1, sticky="ns")
+    xscroll.grid(row=1, column=0, sticky="ew")
+    scroll_area.rowconfigure(0, weight=1)
+    scroll_area.columnconfigure(0, weight=1)
+    body = ttk.Frame(scroller, padding=(0, 0, 8, 8))
+    scroller.create_window((0, 0), window=body, anchor="nw")
+    body.bind("<Configure>", lambda event: scroller.configure(scrollregion=scroller.bbox("all")))
+
+    def mousewheel(event):
+        delta = -1 if event.delta > 0 else 1
+        if event.state & 0x1:
+            scroller.xview_scroll(delta * 3, "units")
+        else:
+            scroller.yview_scroll(delta * 3, "units")
+
+    root.bind_all("<MouseWheel>", mousewheel)
+
+    chart = ttk.LabelFrame(body, text="Combined live evacuation graph", padding=8)
+    chart.pack(fill="x", padx=6, pady=6)
+    ttk.Label(chart, text="Exited pedestrians versus observed wall time · each curve grows as its backend runs").pack(anchor="w")
+    legend = ttk.Frame(chart)
+    legend.pack(fill="x", pady=(4, 2))
+    legend_labels = {}
+    for name in NAMES:
+        cell = ttk.Frame(legend)
+        cell.pack(side="left", padx=(0, 18))
+        swatch = tk.Canvas(cell, width=12, height=12, highlightthickness=0)
+        swatch.create_oval(1, 1, 11, 11, fill=COLORS[name], outline="")
+        swatch.pack(side="left")
+        legend_labels[name] = ttk.Label(cell, text=f"{name.upper()}: waiting")
+        legend_labels[name].pack(side="left", padx=(4, 0))
+    chart_canvas = tk.Canvas(chart, width=1270, height=240, background="white", highlightthickness=0)
+    chart_canvas.pack(anchor="w")
+
+    board = ttk.Frame(body)
+    board.pack(fill="x")
     for i, name in enumerate(NAMES):
         card = ttk.LabelFrame(board, text=name.upper(), padding=8)
-        card.grid(row=i // 3, column=i % 3, sticky="nsew", padx=6, pady=6)
-        canvas = tk.Canvas(card, width=420, height=260, background="white", highlightthickness=0)
-        canvas.pack()
+        card.grid(row=i // 3, column=i % 3, sticky="n", padx=6, pady=6)
         label = ttk.Label(card, text="Waiting", wraplength=410)
-        label.pack(anchor="w", pady=(6, 0))
-        seekbar = ttk.Scale(card, from_=0, to=1, orient="horizontal")
-        seekbar.pack(fill="x", pady=(7, 0))
+        label.pack(anchor="w")
+        metric_label = ttk.Label(card, text="Wall: —  ·  Update: —  ·  Metrics: —", wraplength=410)
+        metric_label.pack(anchor="w", pady=(2, 0))
+        speed_label = ttk.Label(card, text="Average speed: —  ·  Exit rate: —", wraplength=410)
+        speed_label.pack(anchor="w", pady=(2, 0))
+        outcome_label = ttk.Label(card, text="", wraplength=410)
+        outcome_label.pack(anchor="w", pady=(2, 2))
         buttons = ttk.Frame(card)
         buttons.pack(fill="x", pady=(4, 0))
         ttk.Button(buttons, text="◀ Back", command=lambda n=name: move(n, -1)).pack(side="left")
-        ttk.Button(buttons, text="Forward ▶", command=lambda n=name: move(n, 1)).pack(side="left", padx=5)
-        ttk.Button(buttons, text="Live", command=lambda n=name: go_live(n)).pack(side="left")
+        pause_button = ttk.Button(buttons, text="Pause", command=lambda n=name: pause_view(n))
+        pause_button.pack(side="left", padx=5)
+        ttk.Button(buttons, text="Forward ▶", command=lambda n=name: move(n, 1)).pack(side="left")
+        ttk.Button(buttons, text="Live", command=lambda n=name: go_live(n)).pack(side="left", padx=5)
+        seekbar = ttk.Scale(card, from_=0, to=1, orient="horizontal")
+        ttk.Label(card, text="Seek recorded frames").pack(anchor="w", pady=(6, 0))
+        seekbar.pack(fill="x", pady=(7, 0))
+        canvas = tk.Canvas(card, width=420, height=260, background="white", highlightthickness=0)
+        canvas.pack(pady=(5, 0))
         seekbar.configure(command=lambda value, n=name: seek(n, value))
-        cards[name] = dict(canvas=canvas, label=label, seekbar=seekbar,
-                           follow=True, index=0, shown=None, updating=False)
-    for col in range(3):
-        board.columnconfigure(col, weight=1)
-    for row in range(2):
-        board.rowconfigure(row, weight=1)
+        cards[name] = dict(canvas=canvas, label=label, metric=metric_label,
+                           speed=speed_label,
+                           outcome=outcome_label, seekbar=seekbar, pause=pause_button,
+                           cursor=PlaybackCursor(), shown=None, updating=False)
 
     def seek(name, value):
         card = cards[name]
         current = session[0]
         if card["updating"] or current is None:
             return
-        history = current.runs[name].history
-        if history:
-            card["index"] = min(len(history) - 1, max(0, round(float(value))))
-            card["follow"] = False
+        card["cursor"].seek(value, len(current.runs[name].history))
 
     def move(name, direction):
         current = session[0]
         if current is None:
             return
-        card = cards[name]
-        history = current.runs[name].history
-        if history:
-            card["index"] = min(len(history) - 1, max(0, card["index"] + direction))
-            card["follow"] = False
+        cards[name]["cursor"].move(direction, len(current.runs[name].history))
+
+    def pause_view(name):
+        current = session[0]
+        if current is None:
+            return
+        cursor = cards[name]["cursor"]
+        if cursor.follow:
+            cursor.pause(len(current.runs[name].history))
+        else:
+            cursor.live()
 
     def go_live(name):
-        card = cards[name]
-        card["follow"] = True
+        cards[name]["cursor"].live()
 
     def start():
         if session[0] is not None:
@@ -269,27 +397,39 @@ def run_gui(build_dir, pedestrians):
         start_button.configure(state="disabled")
         for name in NAMES:
             card = cards[name]
-            card.update(follow=True, index=0, shown=None)
+            card["cursor"] = PlaybackCursor()
+            card["shown"] = None
             card["updating"] = True
             card["seekbar"].configure(to=1)
             card["seekbar"].set(0)
             card["updating"] = False
             draw_room(card["canvas"], None, current.settings, COLORS[name])
             card["label"].configure(text="Running…")
+            card["metric"].configure(text="Wall: starting  ·  Update: pending  ·  Metrics: pending")
+            card["speed"].configure(text="Average speed: pending  ·  Exit rate: pending")
+            card["outcome"].configure(text="")
+            card["pause"].configure(text="Pause")
+            legend_labels[name].configure(text=f"{name.upper()}: starting")
+        draw_progress_chart(chart_canvas, current.runs, current.pedestrians)
 
     start_button = ttk.Button(controls, text="Run all five", command=start)
     start_button.pack(side="left", padx=8)
+
+    chart_lengths = [None]
 
     def refresh():
         current = session[0]
         if current is not None:
             finished = completed[0] or current.poll()
+            lengths = tuple(len(current.runs[name].history) for name in NAMES)
+            if lengths != chart_lengths[0]:
+                draw_progress_chart(chart_canvas, current.runs, current.pedestrians)
+                chart_lengths[0] = lengths
             for name, run in current.runs.items():
                 card = cards[name]
+                cursor = card["cursor"]
                 if run.history:
-                    if card["follow"]:
-                        card["index"] = len(run.history) - 1
-                    index = card["index"]
+                    index = cursor.selected(len(run.history))
                     frame = run.history[index]
                     if card["shown"] != index:
                         draw_room(card["canvas"], frame, current.settings, COLORS[name])
@@ -298,23 +438,36 @@ def run_gui(build_dir, pedestrians):
                     card["seekbar"].configure(to=max(1, len(run.history) - 1))
                     card["seekbar"].set(index)
                     card["updating"] = False
-                    step, simulated_time, _, active = frame
-                    mode = "Live" if card["follow"] else f"Reviewing frame {index + 1}/{len(run.history)}"
+                    step, simulated_time, _, active, _ = frame
+                    mode = "Live" if cursor.follow else f"Paused · frame {index + 1}/{len(run.history)}"
                     detail = (f"{mode} · step {step}/{current.settings['steps']} · "
                               f"model t={simulated_time:.1f}s · "
                               f"{active} active / {current.pedestrians-active} exited")
+                    legend_labels[name].configure(text=f"{name.upper()}: {current.pedestrians-run.latest[3]} exited")
                 else:
                     detail = "Initializing"
+                card["pause"].configure(text="Pause" if cursor.follow else "Resume")
+                card["label"].configure(text=detail)
+                if run.latest is not None:
+                    wall = max(run.wall_seconds, 0.001)
+                    model_speed = run.latest[1] / wall
+                    exit_rate = (current.pedestrians - run.latest[3]) / wall
+                    card["speed"].configure(
+                        text=f"Average speed: {model_speed:.1f} model s / wall s  ·  "
+                             f"Exit rate: {exit_rate:.1f} people / wall s")
                 if run.ended is None:
-                    card["label"].configure(text=f"{detail}\nRunning {run.wall_seconds:.2f}s wall time")
+                    update = f"{run.update_ms:.2f}ms" if run.update_ms is not None else "pending"
+                    card["metric"].configure(text=f"Wall: {run.wall_seconds:.2f}s running  ·  Update: {update}  ·  Metrics: pending")
+                    card["outcome"].configure(text="Backend still running")
                 elif run.exit_code == 0:
                     final_active = run.latest[3] if run.latest else current.pedestrians
                     outcome = ("Evacuated" if final_active == 0 else
                                f"Maximum duration reached; {final_active} remain")
-                    card["label"].configure(text=f"{detail}\n{outcome} · {run.wall_seconds:.3f}s wall time · "
-                                            f"backend {run.total_ms:.2f}ms · metrics {run.metrics_ms:.2f}ms")
+                    card["metric"].configure(text=f"Wall: {run.wall_seconds:.3f}s  ·  Backend: {run.total_ms:.2f}ms  ·  Metrics: {run.metrics_ms:.2f}ms")
+                    card["outcome"].configure(text=outcome)
                 else:
-                    card["label"].configure(text=f"{detail}\nFailed: {run.message[:200]}")
+                    card["metric"].configure(text=f"Wall: {run.wall_seconds:.3f}s  ·  Update: —  ·  Metrics: —")
+                    card["outcome"].configure(text=f"Failed: {run.message[:200]}")
             if finished and not completed[0]:
                 completed[0] = True
                 start_button.configure(state="normal")
