@@ -22,7 +22,9 @@ def scenario(pedestrians, destination):
     if not 1 <= pedestrians <= 5000:
         raise ValueError("pedestrians must be between 1 and 5000")
     scale = max(1.0, math.sqrt(pedestrians / 100))
-    settings = dict(pedestrians=pedestrians, steps=600, snapshot_interval=10,
+    max_steps = min(12000, max(6000, math.ceil(1.5 * 20 * scale / 1.3 / 0.02)))
+    settings = dict(pedestrians=pedestrians, steps=max_steps, snapshot_interval=25,
+                    stop_when_empty=1,
                     room_width=round(20 * scale, 4), room_height=round(12 * scale, 4),
                     exit_center_y=round(6 * scale, 4), exit_width=round(4 * scale, 4))
     make_config(REPO / "configs" / "wide_exit.cfg", destination, settings)
@@ -41,12 +43,16 @@ class LiveRun:
         self.exit_code = None
         self.message = "Starting"
         self.latest = None
+        self.history = []
         self.total_ms = None
         self.metrics_ms = None
         self._stream = None
         self._pending = ""
         self._frame = []
         self._frame_step = None
+        self._active = 0
+        self._sample_stride = max(1, math.ceil(pedestrians / 500))
+        self._rows = 0
 
     def poll(self):
         path = Path(str(self.prefix) + "_snapshots.csv")
@@ -59,14 +65,19 @@ class LiveRun:
             for line in lines:
                 if not line or line.startswith("step,"):
                     continue
-                fields = next(csv.reader([line]))
+                fields = line.split(",")
                 step = int(fields[0])
                 if self._frame_step != step:
                     self._frame_step, self._frame = step, []
-                self._frame.append((float(fields[3]), float(fields[4]),
-                                    int(fields[9])))
-                if len(self._frame) == self.pedestrians:
-                    self.latest = (step, float(fields[1]), self._frame)
+                    self._active = self._rows = 0
+                active = int(fields[9])
+                self._active += active
+                if self._rows % self._sample_stride == 0:
+                    self._frame.append((float(fields[3]), float(fields[4]), active))
+                self._rows += 1
+                if self._rows == self.pedestrians:
+                    self.latest = (step, float(fields[1]), self._frame, self._active)
+                    self.history.append(self.latest)
                     self._frame = []
         if self.ended is None and self.process.poll() is not None:
             self.ended = time.perf_counter()
@@ -171,8 +182,7 @@ def draw_room(canvas, frame, settings, color):
     if frame is None:
         return
     people = frame[2]
-    stride = max(1, math.ceil(len(people) / 500))
-    for x, y, active in people[::stride]:
+    for x, y, active in people:
         if active:
             px, py = sx(x), sy(y)
             canvas.create_oval(px - 2, py - 2, px + 2, py + 2, fill=color, outline="")
@@ -184,11 +194,11 @@ def run_gui(build_dir, pedestrians):
 
     root = tk.Tk()
     root.title("PCAP live five-backend simulation")
-    root.geometry("1360x920")
+    root.geometry("1380x980")
     outer = ttk.Frame(root, padding=14)
     outer.pack(fill="both", expand=True)
     ttk.Label(outer, text="Live five-backend simulation", font=("Segoe UI", 18, "bold")).pack(anchor="w")
-    ttk.Label(outer, text="Each panel follows a running process at its actual wall-clock speed. Fast runs may finish before the first screen refresh. Concurrent runs share CPU and GPU resources; use the benchmark script for fair speed measurements.",
+    ttk.Label(outer, text="Each panel follows its process at actual wall-clock speed. Seek, Back and Forward inspect recorded frames while the process keeps running; Live returns to the newest frame. Concurrent runs share CPU and GPU resources; use the benchmark script for fair speed measurements.",
               wraplength=1250).pack(anchor="w", pady=(5, 12))
     controls = ttk.Frame(outer)
     controls.pack(fill="x", pady=(0, 12))
@@ -196,6 +206,7 @@ def run_gui(build_dir, pedestrians):
     count = tk.StringVar(value=str(pedestrians))
     ttk.Spinbox(controls, from_=1, to=5000, textvariable=count, width=9).pack(side="left", padx=8)
     session = [None]
+    completed = [False]
     cards = {}
     board = ttk.Frame(outer)
     board.pack(fill="both", expand=True)
@@ -206,11 +217,44 @@ def run_gui(build_dir, pedestrians):
         canvas.pack()
         label = ttk.Label(card, text="Waiting", wraplength=410)
         label.pack(anchor="w", pady=(6, 0))
-        cards[name] = (canvas, label)
+        seekbar = ttk.Scale(card, from_=0, to=1, orient="horizontal")
+        seekbar.pack(fill="x", pady=(7, 0))
+        buttons = ttk.Frame(card)
+        buttons.pack(fill="x", pady=(4, 0))
+        ttk.Button(buttons, text="◀ Back", command=lambda n=name: move(n, -1)).pack(side="left")
+        ttk.Button(buttons, text="Forward ▶", command=lambda n=name: move(n, 1)).pack(side="left", padx=5)
+        ttk.Button(buttons, text="Live", command=lambda n=name: go_live(n)).pack(side="left")
+        seekbar.configure(command=lambda value, n=name: seek(n, value))
+        cards[name] = dict(canvas=canvas, label=label, seekbar=seekbar,
+                           follow=True, index=0, shown=None, updating=False)
     for col in range(3):
         board.columnconfigure(col, weight=1)
     for row in range(2):
         board.rowconfigure(row, weight=1)
+
+    def seek(name, value):
+        card = cards[name]
+        current = session[0]
+        if card["updating"] or current is None:
+            return
+        history = current.runs[name].history
+        if history:
+            card["index"] = min(len(history) - 1, max(0, round(float(value))))
+            card["follow"] = False
+
+    def move(name, direction):
+        current = session[0]
+        if current is None:
+            return
+        card = cards[name]
+        history = current.runs[name].history
+        if history:
+            card["index"] = min(len(history) - 1, max(0, card["index"] + direction))
+            card["follow"] = False
+
+    def go_live(name):
+        card = cards[name]
+        card["follow"] = True
 
     def start():
         if session[0] is not None:
@@ -221,11 +265,17 @@ def run_gui(build_dir, pedestrians):
             messagebox.showerror("Cannot start simulation", str(error))
             return
         session[0] = current
+        completed[0] = False
         start_button.configure(state="disabled")
         for name in NAMES:
-            canvas, label = cards[name]
-            draw_room(canvas, None, current.settings, COLORS[name])
-            label.configure(text="Running…")
+            card = cards[name]
+            card.update(follow=True, index=0, shown=None)
+            card["updating"] = True
+            card["seekbar"].configure(to=1)
+            card["seekbar"].set(0)
+            card["updating"] = False
+            draw_room(card["canvas"], None, current.settings, COLORS[name])
+            card["label"].configure(text="Running…")
 
     start_button = ttk.Button(controls, text="Run all five", command=start)
     start_button.pack(side="left", padx=8)
@@ -233,27 +283,41 @@ def run_gui(build_dir, pedestrians):
     def refresh():
         current = session[0]
         if current is not None:
-            finished = current.poll()
+            finished = completed[0] or current.poll()
             for name, run in current.runs.items():
-                canvas, label = cards[name]
-                if run.latest is not None:
-                    draw_room(canvas, run.latest, current.settings, COLORS[name])
-                    step, simulated_time, people = run.latest
-                    active = sum(person[2] for person in people)
-                    detail = (f"Step {step}/600 · model t={simulated_time:.1f}s · "
-                              f"{active} active / {len(people)-active} exited")
+                card = cards[name]
+                if run.history:
+                    if card["follow"]:
+                        card["index"] = len(run.history) - 1
+                    index = card["index"]
+                    frame = run.history[index]
+                    if card["shown"] != index:
+                        draw_room(card["canvas"], frame, current.settings, COLORS[name])
+                        card["shown"] = index
+                    card["updating"] = True
+                    card["seekbar"].configure(to=max(1, len(run.history) - 1))
+                    card["seekbar"].set(index)
+                    card["updating"] = False
+                    step, simulated_time, _, active = frame
+                    mode = "Live" if card["follow"] else f"Reviewing frame {index + 1}/{len(run.history)}"
+                    detail = (f"{mode} · step {step}/{current.settings['steps']} · "
+                              f"model t={simulated_time:.1f}s · "
+                              f"{active} active / {current.pedestrians-active} exited")
                 else:
                     detail = "Initializing"
                 if run.ended is None:
-                    label.configure(text=f"{detail}\nRunning {run.wall_seconds:.2f}s wall time")
+                    card["label"].configure(text=f"{detail}\nRunning {run.wall_seconds:.2f}s wall time")
                 elif run.exit_code == 0:
-                    label.configure(text=f"{detail}\nFinished in {run.wall_seconds:.3f}s wall time · "
-                                         f"backend {run.total_ms:.2f}ms · metrics {run.metrics_ms:.2f}ms")
+                    final_active = run.latest[3] if run.latest else current.pedestrians
+                    outcome = ("Evacuated" if final_active == 0 else
+                               f"Maximum duration reached; {final_active} remain")
+                    card["label"].configure(text=f"{detail}\n{outcome} · {run.wall_seconds:.3f}s wall time · "
+                                            f"backend {run.total_ms:.2f}ms · metrics {run.metrics_ms:.2f}ms")
                 else:
-                    label.configure(text=f"{detail}\nFailed: {run.message[:200]}")
-            if finished:
+                    card["label"].configure(text=f"{detail}\nFailed: {run.message[:200]}")
+            if finished and not completed[0]:
+                completed[0] = True
                 start_button.configure(state="normal")
-                session[0] = None
                 current.close()
         root.after(80, refresh)
 

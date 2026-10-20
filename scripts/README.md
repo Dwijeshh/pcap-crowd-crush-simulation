@@ -26,5 +26,8 @@ the recorded hardware and results.
 runs all five built executables concurrently. It reads snapshots while each
 process is running, with no playback clock. Its wall times include launch and
 output overhead; the executables' reported times use their own timing scopes.
+The live scenario runs until evacuation or a stated maximum step. Each panel
+has seek, Back, Forward, and Live controls; seeking only changes the viewed
+snapshot and does not affect the backend process.
 Run `python scripts/live_compare.py --build-dir build-all` from the repo root.
 Use `--headless --pedestrians 1000` to run the same comparison without a window.

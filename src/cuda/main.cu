@@ -77,16 +77,25 @@ int main(int argc, char** argv) {
                 metrics->sample(host, t);
                 metrics_ms += milliseconds(metrics_start);
             }
-            if (t % c.snapshot_interval == 0 || t == c.steps) {
-                if (!metrics_enabled) {
+            const bool check_evacuation = c.stop_when_empty && !metrics_enabled;
+            if (check_evacuation) {
+                transfer_start = std::chrono::steady_clock::now();
+                a->download(host);
+                const double download_ms = milliseconds(transfer_start);
+                transfer_ms += download_ms; total_ms += download_ms;
+            }
+            const bool evacuated = c.stop_when_empty && pcap::active_count(host) == 0;
+            if (t % c.snapshot_interval == 0 || t == c.steps || evacuated) {
+                if (!metrics_enabled && !check_evacuation) {
                     transfer_start = std::chrono::steady_clock::now();
                     a->download(host);
                     const double download_ms = milliseconds(transfer_start);
                     transfer_ms += download_ms; total_ms += download_ms;
                 }
-                output.record(host, t, t * c.dt, kernel_ms);
+                output.record(host, t, t * c.dt, kernel_ms, evacuated);
                 if (metrics_enabled) metrics_output->record(metrics->output());
             }
+            if (evacuated) break;
         }
         output.finish(total_ms, kernel_ms, transfer_ms, properties.name, 0, metrics_ms);
         std::cout << "cuda: " << c.pedestrians - pcap::active_count(host)

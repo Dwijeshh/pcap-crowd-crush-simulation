@@ -54,12 +54,15 @@ int main(int argc, char** argv) {
                 const double m0 = MPI_Wtime();
                 metrics->sample(current, t, 1);
                 metrics_s += MPI_Wtime() - m0;
-                if (t % c.snapshot_interval == 0 || t == c.steps) {
-                    output->record(current, t, static_cast<float>(t) * c.dt, update_s * 1000.0);
+                const bool evacuated = c.stop_when_empty && pcap::active_count(current) == 0;
+                if (t % c.snapshot_interval == 0 || t == c.steps || evacuated) {
+                    output->record(current, t, static_cast<float>(t) * c.dt,
+                                   update_s * 1000.0, evacuated);
                     metrics_output->record(metrics->output());
                 }
             }
             MPI_Barrier(MPI_COMM_WORLD);  // keeps rank 0's extra work out of timing
+            if (c.stop_when_empty && pcap::active_count(current) == 0) break;
         }
 
         // Report the slowest rank for each component, as the plan requires.

@@ -99,8 +99,11 @@ Enter the number of pedestrians (1–5,000) and click **Run all five**. The
 desktop window launches five independent processes, draws each backend's
 snapshots as they arrive, and shows its actual wall-clock completion time and
 reported backend time. The room and exit scale with crowd size to keep initial
-density comparable. At 100 pedestrians some runs finish before the first
-screen refresh; the default of 2,000 makes progress easier to see. Concurrent runs share
+density comparable. Live runs continue until everyone exits or the displayed
+maximum step is reached; if anyone remains, the panel says so. Use each panel's
+seek bar, **Back**, and **Forward** to inspect snapshots while that backend keeps
+running, then **Live** to return to its latest frame. The default of 2,000 makes
+progress easier to see. Concurrent runs share
 CPU and GPU resources, so use the repeated benchmark results for fair speed
 comparisons.
 

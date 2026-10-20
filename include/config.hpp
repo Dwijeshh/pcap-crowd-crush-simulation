@@ -8,6 +8,7 @@ struct Config {
     int pedestrians = 100;
     int steps = 500;
     int snapshot_interval = 10;
+    int stop_when_empty = 0;
     std::uint32_t seed = 42;
     float dt = 0.02f;
     float room_width = 20.0f, room_height = 12.0f;

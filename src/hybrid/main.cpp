@@ -124,11 +124,13 @@ int main(int argc, char** argv) {
             local = metrics.accumulate(current, layout.begin(), layout.end(), threads);
             metrics.sample_aggregate(combine(local, MPI_COMM_WORLD), c.pedestrians, step);
             metrics_ms += (MPI_Wtime() - phase_start) * 1000;
-            if (rank == 0 && (step % c.snapshot_interval == 0 || step == c.steps)) {
-                output->record(current, step, step * c.dt, update_ms);
+            const bool evacuated = c.stop_when_empty && pcap::active_count(current) == 0;
+            if (rank == 0 && (step % c.snapshot_interval == 0 || step == c.steps || evacuated)) {
+                output->record(current, step, step * c.dt, update_ms, evacuated);
                 metrics_output->record(metrics.output());
             }
             MPI_Barrier(MPI_COMM_WORLD);
+            if (evacuated) break;
         }
 
         const double local_timing[5] = {update_ms, kernel_ms, transfer_ms,

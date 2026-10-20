@@ -13,10 +13,11 @@ Output::Output(const std::string& prefix, const Config& config, const std::strin
     write_snapshot_header(snapshots_);
     write_summary_header(summary_);
 }
-void Output::record(const State& state, int step, float time, double simulation_ms) {
+void Output::record(const State& state, int step, float time, double simulation_ms,
+                    bool final_step) {
     write_summary(summary_, state, step, time, simulation_ms);
     summary_.flush();
-    if (step % config_.snapshot_interval == 0 || step == config_.steps) {
+    if (step % config_.snapshot_interval == 0 || step == config_.steps || final_step) {
         write_snapshot(snapshots_, state, step, time);
         snapshots_.flush();
     }
