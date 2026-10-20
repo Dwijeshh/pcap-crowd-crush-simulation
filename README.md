@@ -71,6 +71,19 @@ python scripts/visualize.py heatmap configs/wide_exit.cfg results/tmp/wide_snaps
 python scripts/visualize.py timeseries configs/wide_exit.cfg results/tmp/wide_snapshots.csv results/tmp/wide_summary.csv results/tmp/wide
 ```
 
+To watch all five completed runs side by side on one synchronized timeline,
+run each backend with the same config and different output prefixes, then run:
+
+```sh
+python scripts/visualize.py compare configs/wide_exit.cfg \
+  results/tmp/seq_snapshots.csv results/tmp/omp_snapshots.csv \
+  results/tmp/mpi_snapshots.csv results/tmp/cuda_snapshots.csv \
+  results/tmp/hybrid_snapshots.csv results/tmp/comparison.html
+```
+
+Open `results/tmp/comparison.html` in a browser. This is a replay of saved
+snapshots at matching simulation steps; it does not run five processes at once.
+
 On multi-configuration generators, executables may be under `build/Release/`.
 Each run writes `_snapshots.csv`, `_summary.csv`, `_run.csv`, `_metrics.csv`,
 and `_cells.csv` at the output prefix. MPI adds `_mpi_timing.csv`; hybrid adds

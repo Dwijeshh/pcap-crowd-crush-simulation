@@ -227,12 +227,80 @@ setInterval(()=>{if(playing){index=(index+1)%data.frames.length;draw()}},90);dra
     Path(args.output).write_text(page.replace("__DATA__", data), encoding="utf-8")
 
 
+def compare(args):
+    cfg = config(args.config)
+    runs = [(name, snapshots(path)) for name, path in (
+        ("Sequential", args.sequential), ("OpenMP", args.openmp),
+        ("MPI", args.mpi), ("CUDA", args.cuda), ("Hybrid", args.hybrid))]
+    steps = list(runs[0][1])
+    if not steps:
+        raise ValueError("snapshot files contain no frames")
+    for name, frames in runs[1:]:
+        if list(frames) != steps:
+            raise ValueError(f"{name} snapshot steps do not match the sequential run")
+    compact = []
+    for step in steps:
+        time = runs[0][1][step][0]["time"]
+        panels = []
+        for name, frames in runs:
+            frame = frames[step]
+            if not frame or abs(frame[0]["time"] - time) > 1e-6:
+                raise ValueError(f"{name} snapshot time differs at step {step}")
+            panels.append([[round(p["x"], 4), round(p["y"], 4), int(p["active"])]
+                           for p in frame])
+        compact.append({"step": step, "time": time, "panels": panels})
+    data = json.dumps({"config": cfg, "names": [name for name, _ in runs],
+                       "frames": compact}, separators=(",", ":"))
+    page = """<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PCAP five-backend comparison</title><style>
+body{margin:0;background:#eef5f8;color:#18324b;font:16px Arial,sans-serif}
+main{max-width:1450px;margin:22px auto;padding:20px}h1{margin:0 0 6px}
+p{margin:0 0 18px;color:#486276}.controls{display:flex;gap:14px;align-items:center;margin-bottom:18px}
+.controls input{flex:1}button{background:#147d9d;color:white;border:0;border-radius:6px;padding:9px 18px;cursor:pointer}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.card{background:white;padding:12px;border-radius:10px;box-shadow:0 5px 18px #16324b20}
+.card h2{font-size:18px;margin:0 0 8px}.card canvas{display:block;width:100%;height:auto}
+.count{color:#486276;font-size:14px;margin-top:7px}</style>
+<main><h1>Five-backend crowd comparison</h1>
+<p>Synchronized replay of completed runs. Each panel shows the same simulation step and room scale; playback speed is for viewing only.</p>
+<div class="controls"><button id="play">Play</button><input id="frame" type="range" min="0" value="0" aria-label="Simulation frame"><span id="status"></span></div>
+<div id="grid" class="grid"></div></main>
+<script>const data=__DATA__,cfg=data.config,frames=data.frames,grid=document.getElementById('grid'),
+slider=document.getElementById('frame'),status=document.getElementById('status'),button=document.getElementById('play');
+slider.max=frames.length-1;let index=0,playing=false;
+const cards=data.names.map(name=>{const card=document.createElement('section');card.className='card';
+const heading=document.createElement('h2');heading.textContent=name;const canvas=document.createElement('canvas');
+canvas.width=500;canvas.height=320;const count=document.createElement('div');count.className='count';
+card.append(heading,canvas,count);grid.append(card);return {ctx:canvas.getContext('2d'),count}});
+const W=cfg.room_width,H=cfg.room_height,sx=x=>30+x/W*440,sy=y=>285-y/H*255;
+function scene(ctx,people){ctx.clearRect(0,0,500,320);ctx.fillStyle='#edf5f8';ctx.fillRect(sx(0),sy(H),440,255);
+ctx.strokeStyle='#18324b';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(sx(0),sy(0));ctx.lineTo(sx(0),sy(H));ctx.lineTo(sx(W),sy(H));
+const lo=cfg.exit_center_y-cfg.exit_width/2,hi=cfg.exit_center_y+cfg.exit_width/2;
+ctx.moveTo(sx(W),sy(H));ctx.lineTo(sx(W),sy(hi));ctx.moveTo(sx(W),sy(lo));ctx.lineTo(sx(W),sy(0));ctx.lineTo(sx(0),sy(0));ctx.stroke();
+ctx.strokeStyle='#ed8b36';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(sx(W),sy(hi));ctx.lineTo(sx(W),sy(lo));ctx.stroke();
+if(cfg.obstacle_radius>0){ctx.fillStyle='#667c8e';ctx.beginPath();ctx.arc(sx(cfg.obstacle_x),sy(cfg.obstacle_y),cfg.obstacle_radius/W*440,0,2*Math.PI);ctx.fill()}
+ctx.fillStyle='#147d9d';let active=0;for(const p of people){if(!p[2])continue;active++;ctx.beginPath();ctx.arc(sx(p[0]),sy(p[1]),Math.max(2,cfg.radius/W*440),0,2*Math.PI);ctx.fill()}
+return active}
+function draw(){const f=frames[index];cards.forEach((card,i)=>{const active=scene(card.ctx,f.panels[i]);
+card.count.textContent=`${active} active · ${f.panels[i].length-active} exited`});
+status.textContent=`step ${f.step} · t=${f.time.toFixed(2)} s`;slider.value=index}
+slider.addEventListener('input',()=>{index=Number(slider.value);draw()});
+button.onclick=()=>{playing=!playing;button.textContent=playing?'Pause':'Play'};
+setInterval(()=>{if(playing){index=(index+1)%frames.length;draw()}},120);draw();</script></html>"""
+    Path(args.output).write_text(page.replace("__DATA__", data), encoding="utf-8")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     animation = sub.add_parser("animate")
     animation.add_argument("config"); animation.add_argument("snapshots"); animation.add_argument("output")
     animation.set_defaults(func=animate)
+    comparison = sub.add_parser("compare", help="synchronized replay of all five backends")
+    comparison.add_argument("config")
+    for name in ("sequential", "openmp", "mpi", "cuda", "hybrid", "output"):
+        comparison.add_argument(name)
+    comparison.set_defaults(func=compare)
     heat = sub.add_parser("heatmap")
     heat.add_argument("config"); heat.add_argument("snapshots"); heat.add_argument("output")
     heat.add_argument("--step", type=int); heat.add_argument("--cell", type=float, default=1.0)
