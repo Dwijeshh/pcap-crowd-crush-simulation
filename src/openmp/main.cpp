@@ -38,10 +38,12 @@ int main(int argc, char** argv) {
             metrics.sample(current, t, threads);
             metrics_ms += std::chrono::duration<double, std::milli>(
                 std::chrono::steady_clock::now() - metrics_start).count();
-            if (t % c.snapshot_interval == 0 || t == c.steps) {
-                output.record(current, t, t * c.dt, update_ms);
+            const bool evacuated = c.stop_when_empty && pcap::active_count(current) == 0;
+            if (t % c.snapshot_interval == 0 || t == c.steps || evacuated) {
+                output.record(current, t, t * c.dt, update_ms, evacuated);
                 metrics_output.record(metrics.output());
             }
+            if (evacuated) break;
         }
         output.finish(update_ms, 0, 0, "cpu", threads, metrics_ms);
         std::cout << "openmp (" << threads << " threads): "

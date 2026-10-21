@@ -8,6 +8,7 @@ namespace pcap {
 void validate(const Config& c) {
     auto positive = [](float v) { return std::isfinite(v) && v > 0; };
     if (c.pedestrians < 0 || c.steps < 0 || c.snapshot_interval <= 0 ||
+        (c.stop_when_empty != 0 && c.stop_when_empty != 1) ||
         !positive(c.dt) || !positive(c.room_width) || !positive(c.room_height) ||
         !positive(c.exit_width) || c.exit_width > c.room_height ||
         !positive(c.radius) || !positive(c.preferred_speed) || !positive(c.mass) ||
@@ -65,6 +66,7 @@ Config load_config(const std::string& path) {
     auto setf = [&](const char* key, float& target) { auto it = values.find(key); if (it != values.end()) { target = static_cast<float>(it->second); values.erase(it); } };
     auto seti = [&](const char* key, int& target) { auto it = values.find(key); if (it != values.end()) { if (it->second != std::floor(it->second) || it->second < -2147483648.0 || it->second > 2147483647.0) throw std::runtime_error("invalid integer: " + std::string(key)); target = static_cast<int>(it->second); values.erase(it); } };
     seti("pedestrians", c.pedestrians); seti("steps", c.steps); seti("snapshot_interval", c.snapshot_interval);
+    seti("stop_when_empty", c.stop_when_empty);
     auto seed = values.find("seed");
     if (seed != values.end()) { if (seed->second != std::floor(seed->second) || seed->second < 0 || seed->second > 4294967295.0) throw std::runtime_error("invalid seed"); c.seed = static_cast<std::uint32_t>(seed->second); values.erase(seed); }
     setf("dt", c.dt); setf("room_width", c.room_width); setf("room_height", c.room_height);

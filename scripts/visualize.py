@@ -227,12 +227,118 @@ setInterval(()=>{if(playing){index=(index+1)%data.frames.length;draw()}},90);dra
     Path(args.output).write_text(page.replace("__DATA__", data), encoding="utf-8")
 
 
+def compare(args):
+    cfg = config(args.config)
+    paths = (
+        ("Sequential", args.sequential), ("OpenMP", args.openmp),
+        ("MPI", args.mpi), ("CUDA", args.cuda), ("Hybrid", args.hybrid))
+    runs = [(name, snapshots(path)) for name, path in paths]
+    steps = list(runs[0][1])
+    if not steps:
+        raise ValueError("snapshot files contain no frames")
+    for name, frames in runs[1:]:
+        if list(frames) != steps:
+            raise ValueError(f"{name} snapshot steps do not match the sequential run")
+    timings = []
+    for name, path in paths:
+        if not path.endswith("_snapshots.csv"):
+            raise ValueError(f"{name} input must end in _snapshots.csv")
+        prefix = path[:-len("_snapshots.csv")]
+        summary = {int(row["step"]): row for row in read_rows(prefix + "_summary.csv")}
+        run_rows = read_rows(prefix + "_run.csv")
+        if len(run_rows) != 1 or run_rows[0]["backend"] != name.lower():
+            raise ValueError(f"{name} run CSV does not match its snapshot input")
+        elapsed = [float(summary[step]["simulation_ms"]) for step in steps]
+        if (not all(math.isfinite(value) and value >= 0 for value in elapsed)
+                or any(b < a for a, b in zip(elapsed, elapsed[1:]))
+                or elapsed[-1] <= 0):
+            raise ValueError(f"{name} cumulative simulation times are invalid")
+        run = run_rows[0]
+        total_ms = float(run["total_ms"])
+        metrics_ms = float(run["metrics_ms"])
+        if not all(math.isfinite(value) and value >= 0 for value in (total_ms, metrics_ms)):
+            raise ValueError(f"{name} run timings are invalid")
+        timings.append({"elapsed": elapsed, "movement_ms": elapsed[-1],
+                        "total_ms": total_ms, "metrics_ms": metrics_ms})
+    compact = []
+    for step in steps:
+        time = runs[0][1][step][0]["time"]
+        panels = []
+        for name, frames in runs:
+            frame = frames[step]
+            if not frame or abs(frame[0]["time"] - time) > 1e-6:
+                raise ValueError(f"{name} snapshot time differs at step {step}")
+            panels.append([[round(p["x"], 4), round(p["y"], 4), int(p["active"])]
+                           for p in frame])
+        compact.append({"step": step, "time": time, "panels": panels})
+    data = json.dumps({"config": cfg, "names": [name for name, _ in runs],
+                       "frames": compact, "timings": timings}, separators=(",", ":"))
+    page = """<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PCAP five-backend comparison</title><style>
+body{margin:0;background:#eef5f8;color:#18324b;font:16px Arial,sans-serif}
+main{max-width:1450px;margin:22px auto;padding:20px}h1{margin:0 0 6px}
+p{margin:0 0 18px;color:#486276}.controls{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+.controls input{flex:1;min-width:180px}button{background:#147d9d;color:white;border:0;border-radius:6px;padding:9px 18px;cursor:pointer}
+select{padding:7px;border:1px solid #b6cdd9;border-radius:6px;background:white;color:#18324b}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.card{background:white;padding:12px;border-radius:10px;box-shadow:0 5px 18px #16324b20}
+.card h2{font-size:18px;margin:0 0 8px}.card canvas{display:block;width:100%;height:auto}
+.count,.metric{color:#486276;font-size:14px;margin-top:7px}.track{height:7px;background:#edf5f8;border-radius:5px;margin-top:9px}
+.fill{height:100%;background:#147d9d;border-radius:5px;width:0}</style>
+<main><h1>Five-backend crowd comparison</h1>
+<p>Model time compares positions at the same simulation step. Compute time advances each panel using its recorded cumulative simulation time, stretched for viewing. Timing boundaries differ by backend; these single-run numbers are indicative. Both modes replay completed runs.</p>
+<div class="controls"><label>View <select id="mode"><option value="model">Model time</option><option value="compute">Compute time</option></select></label>
+<label>Replay duration <select id="duration"><option value="10000">10 s</option><option value="20000" selected>20 s</option><option value="40000">40 s</option></select></label>
+<button id="play">Play</button><input id="frame" type="range" min="0" max="1000" value="0" aria-label="Playback progress"><span id="status"></span></div>
+<div id="grid" class="grid"></div></main>
+<script>const data=__DATA__,cfg=data.config,frames=data.frames,grid=document.getElementById('grid'),
+slider=document.getElementById('frame'),status=document.getElementById('status'),button=document.getElementById('play'),
+mode=document.getElementById('mode'),duration=document.getElementById('duration');
+const maxMs=Math.max(...data.timings.map(t=>t.movement_ms)),baseline=data.timings[0].total_ms;
+let position=0,playing=false,lastTick=null;
+const cards=data.names.map((name,i)=>{const card=document.createElement('section');card.className='card';
+const heading=document.createElement('h2');heading.textContent=name;const canvas=document.createElement('canvas');
+canvas.width=500;canvas.height=320;const count=document.createElement('div');count.className='count';
+const metric=document.createElement('div');metric.className='metric';const timing=data.timings[i];
+metric.textContent=`Recorded simulation ${timing.movement_ms.toFixed(2)} ms · reported total ${timing.total_ms.toFixed(2)} ms · ${(baseline/timing.total_ms).toFixed(2)}× sequential · metrics ${timing.metrics_ms.toFixed(2)} ms`;
+const track=document.createElement('div');track.className='track';const fill=document.createElement('div');fill.className='fill';track.append(fill);
+card.append(heading,canvas,count,metric,track);grid.append(card);return {ctx:canvas.getContext('2d'),count,fill}});
+const W=cfg.room_width,H=cfg.room_height,sx=x=>30+x/W*440,sy=y=>285-y/H*255;
+function scene(ctx,people){ctx.clearRect(0,0,500,320);ctx.fillStyle='#edf5f8';ctx.fillRect(sx(0),sy(H),440,255);
+ctx.strokeStyle='#18324b';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(sx(0),sy(0));ctx.lineTo(sx(0),sy(H));ctx.lineTo(sx(W),sy(H));
+const lo=cfg.exit_center_y-cfg.exit_width/2,hi=cfg.exit_center_y+cfg.exit_width/2;
+ctx.moveTo(sx(W),sy(H));ctx.lineTo(sx(W),sy(hi));ctx.moveTo(sx(W),sy(lo));ctx.lineTo(sx(W),sy(0));ctx.lineTo(sx(0),sy(0));ctx.stroke();
+ctx.strokeStyle='#ed8b36';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(sx(W),sy(hi));ctx.lineTo(sx(W),sy(lo));ctx.stroke();
+if(cfg.obstacle_radius>0){ctx.fillStyle='#667c8e';ctx.beginPath();ctx.arc(sx(cfg.obstacle_x),sy(cfg.obstacle_y),cfg.obstacle_radius/W*440,0,2*Math.PI);ctx.fill()}
+ctx.fillStyle='#147d9d';let active=0;for(const p of people){if(!p[2])continue;active++;ctx.beginPath();ctx.arc(sx(p[0]),sy(p[1]),Math.max(2,cfg.radius/W*440),0,2*Math.PI);ctx.fill()}
+return active}
+function frameAtElapsed(times,elapsed){let lo=0,hi=times.length-1;while(lo<hi){const mid=Math.ceil((lo+hi)/2);if(times[mid]<=elapsed)lo=mid;else hi=mid-1}return lo}
+function draw(){const modelIndex=Math.round(position*(frames.length-1)),elapsed=position*maxMs;
+cards.forEach((card,i)=>{const timing=data.timings[i],index=mode.value==='model'?modelIndex:frameAtElapsed(timing.elapsed,elapsed),f=frames[index];
+const active=scene(card.ctx,f.panels[i]);card.count.textContent=`step ${f.step} · t=${f.time.toFixed(2)} s · ${active} active · ${f.panels[i].length-active} exited`;
+card.fill.style.width=`${100*index/(frames.length-1)}%`});
+status.textContent=mode.value==='model'?`step ${frames[modelIndex].step} · t=${frames[modelIndex].time.toFixed(2)} s`:
+`compute clock ${elapsed.toFixed(1)} / ${maxMs.toFixed(1)} ms`;slider.value=Math.round(position*1000)}
+function reset(){position=0;playing=false;lastTick=null;button.textContent='Play';draw()}
+slider.addEventListener('input',()=>{position=Number(slider.value)/1000;draw()});mode.addEventListener('change',reset);
+button.onclick=()=>{if(position>=1)position=0;playing=!playing;lastTick=null;button.textContent=playing?'Pause':'Play';draw()};
+function tick(now){if(playing){if(lastTick!==null){position=Math.min(1,position+(now-lastTick)/Number(duration.value));
+if(position===1){playing=false;button.textContent='Play'}draw()}lastTick=now}requestAnimationFrame(tick)}
+requestAnimationFrame(tick);draw();</script></html>"""
+    Path(args.output).write_text(page.replace("__DATA__", data), encoding="utf-8")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     animation = sub.add_parser("animate")
     animation.add_argument("config"); animation.add_argument("snapshots"); animation.add_argument("output")
     animation.set_defaults(func=animate)
+    comparison = sub.add_parser("compare", help="synchronized replay of all five backends")
+    comparison.add_argument("config")
+    for name in ("sequential", "openmp", "mpi", "cuda", "hybrid", "output"):
+        comparison.add_argument(name)
+    comparison.set_defaults(func=compare)
     heat = sub.add_parser("heatmap")
     heat.add_argument("config"); heat.add_argument("snapshots"); heat.add_argument("output")
     heat.add_argument("--step", type=int); heat.add_argument("--cell", type=float, default=1.0)

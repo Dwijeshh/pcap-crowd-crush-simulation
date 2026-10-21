@@ -71,6 +71,47 @@ python scripts/visualize.py heatmap configs/wide_exit.cfg results/tmp/wide_snaps
 python scripts/visualize.py timeseries configs/wide_exit.cfg results/tmp/wide_snapshots.csv results/tmp/wide_summary.csv results/tmp/wide
 ```
 
+To watch all five completed runs side by side on one synchronized timeline,
+run each backend with the same config and different output prefixes, then run:
+
+```sh
+python scripts/visualize.py compare configs/wide_exit.cfg \
+  results/tmp/seq_snapshots.csv results/tmp/omp_snapshots.csv \
+  results/tmp/mpi_snapshots.csv results/tmp/cuda_snapshots.csv \
+  results/tmp/hybrid_snapshots.csv results/tmp/comparison.html
+```
+
+Open `results/tmp/comparison.html` in a browser. **Model time** keeps all five
+panels on the same simulation step. **Compute time** advances each panel
+independently using cumulative `simulation_ms` from its matching `_summary.csv`;
+the page also shows `_run.csv` timing and speedup versus sequential. Playback
+is stretched for viewing and replays completed runs. Single-run timing
+boundaries differ by backend, so use the repeated benchmark results for
+performance claims.
+
+For a live comparison, build all five executables and run:
+
+```powershell
+python scripts\live_compare.py --build-dir build-all
+```
+
+Enter the number of pedestrians (1–5,000) and click **Run all five**. The
+desktop window launches five independent processes, draws each backend's
+snapshots as they arrive, and shows its actual wall-clock completion time and
+reported backend time. The room and exit scale with crowd size to keep initial
+density comparable. Live runs continue until everyone exits or the displayed
+maximum step is reached; if anyone remains, the panel says so. The window
+scrolls vertically and horizontally. Each panel shows wall time, update time,
+average simulation speed, and exit rate while running, then its final backend
+and metrics times. **Pause** freezes
+only that panel's view; the seek bar, **Back**, and **Forward** inspect recorded
+snapshots while the backend keeps running. **Live** returns to its newest frame.
+The combined graph plots exited pedestrians against observed wall time for all five
+backends and grows as their snapshots arrive. The default of 2,000 makes
+progress easier to see. Concurrent runs share
+CPU and GPU resources, so use the repeated benchmark results for fair speed
+comparisons.
+
 On multi-configuration generators, executables may be under `build/Release/`.
 Each run writes `_snapshots.csv`, `_summary.csv`, `_run.csv`, `_metrics.csv`,
 and `_cells.csv` at the output prefix. MPI adds `_mpi_timing.csv`; hybrid adds
