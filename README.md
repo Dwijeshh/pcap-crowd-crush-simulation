@@ -131,6 +131,16 @@ paths to the available executables and `--mpiexec`. The committed
 cover four crowd sizes and three exit widths. The hybrid report explains
 the timing boundaries and one-GPU limitation.
 
+## Report studies
+
+The [configuration and risk studies](docs/report_studies.md) add a 29-setting
+parallel sweep with CPU efficiency, plus density, speed, congestion and exit
+measurements across two crowd sizes and three exit widths. Their CSVs and
+figures are under `results/benchmarks/configuration_study/` and
+`results/risk_study/`. Run `python scripts/report_studies.py parallelism` and
+`python scripts/report_studies.py risk` to reproduce them with all five
+backends available.
+
 ## Development order
 
 1. Agree on equations, parameters, configuration and output formats.

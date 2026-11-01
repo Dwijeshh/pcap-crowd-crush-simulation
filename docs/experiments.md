@@ -17,3 +17,7 @@ The completed five-backend local benchmark and its timing limits are in
 [`hybrid_validation.md`](hybrid_validation.md). Raw runs, summaries and plots
 are in `results/benchmarks/all_backends/`. The separate CUDA block-size study
 is in `sammit_benchmarks.md`.
+
+The later [report studies](report_studies.md) add measured rank/thread/block
+configuration sweeps, CPU parallel efficiency, and a cross-backend simulated
+risk study with matched exit-width timing cases.
