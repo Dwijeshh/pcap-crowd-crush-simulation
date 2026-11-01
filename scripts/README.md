@@ -22,6 +22,14 @@ checks that exited counts agree. It needs paths to the built executables and
 an MPI launcher. See [hybrid validation](../docs/hybrid_validation.md) for
 the recorded hardware and results.
 
+`report_studies.py parallelism` measures 29 OpenMP, MPI, CUDA, and hybrid
+configurations with a warmup and five repetitions each, then calculates CPU
+parallel efficiency where the worker count is defined. `report_studies.py risk`
+compares six crowd/exit scenarios across all five backends, saves density,
+speed, congestion, exit-flow and risk-category data, and links the 100-person
+cases to the existing repeated timing benchmark. See
+[report studies](../docs/report_studies.md) for methods and limitations.
+
 `live_compare.py` opens a Tkinter window with a pedestrian-count input and
 runs all five built executables concurrently. It reads snapshots while each
 process is running, with no playback clock. Its wall times include launch and
