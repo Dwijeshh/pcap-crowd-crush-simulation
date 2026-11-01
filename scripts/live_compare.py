@@ -18,15 +18,18 @@ COLORS = {"sequential": "#235789", "openmp": "#f18f01", "mpi": "#6f42a3",
 REPO = Path(__file__).resolve().parents[1]
 
 
-def scenario(pedestrians, destination):
+def scenario(pedestrians, destination, base_exit_width=4):
     if not 1 <= pedestrians <= 5000:
         raise ValueError("pedestrians must be between 1 and 5000")
+    if base_exit_width not in (1, 2, 4):
+        raise ValueError("base exit width must be 1, 2, or 4 metres")
     scale = max(1.0, math.sqrt(pedestrians / 100))
     max_steps = min(12000, max(6000, math.ceil(1.5 * 20 * scale / 1.3 / 0.02)))
     settings = dict(pedestrians=pedestrians, steps=max_steps, snapshot_interval=25,
                     stop_when_empty=1,
                     room_width=round(20 * scale, 4), room_height=round(12 * scale, 4),
-                    exit_center_y=round(6 * scale, 4), exit_width=round(4 * scale, 4))
+                    exit_center_y=round(6 * scale, 4),
+                    exit_width=round(base_exit_width * scale, 4))
     make_config(REPO / "configs" / "wide_exit.cfg", destination, settings)
     return settings
 
@@ -50,6 +53,10 @@ class LiveRun:
         self._stream = None
         self._summary_stream = None
         self._summary_pending = ""
+        self.metric_rows = {}
+        self._metrics_stream = None
+        self._metrics_pending = ""
+        self._metrics_fields = None
         self._pending = ""
         self._frame = []
         self._frame_step = None
@@ -58,6 +65,22 @@ class LiveRun:
         self._rows = 0
 
     def poll(self):
+        metrics_path = Path(str(self.prefix) + "_metrics.csv")
+        if self._metrics_stream is None and metrics_path.exists():
+            self._metrics_stream = metrics_path.open(encoding="utf-8", newline="")
+        if self._metrics_stream is not None:
+            self._metrics_pending += self._metrics_stream.read()
+            metric_lines = self._metrics_pending.split("\n")
+            self._metrics_pending = metric_lines.pop()
+            for line in metric_lines:
+                if not line:
+                    continue
+                fields = next(csv.reader([line]))
+                if self._metrics_fields is None:
+                    self._metrics_fields = fields
+                else:
+                    row = dict(zip(self._metrics_fields, fields))
+                    self.metric_rows[int(row["step"])] = row
         summary_path = Path(str(self.prefix) + "_summary.csv")
         if self._summary_stream is None and summary_path.exists():
             self._summary_stream = summary_path.open(encoding="utf-8", newline="")
@@ -123,11 +146,14 @@ class LiveRun:
             self._stream.close()
         if self._summary_stream is not None:
             self._summary_stream.close()
+        if self._metrics_stream is not None:
+            self._metrics_stream.close()
 
 
 class LiveSession:
-    def __init__(self, build_dir, pedestrians):
+    def __init__(self, build_dir, pedestrians, base_exit_width=4):
         self.pedestrians = pedestrians
+        self.base_exit_width = base_exit_width
         self.build_dir = build_dir.resolve()
         suffix = ".exe" if sys.platform == "win32" else ""
         programs = {name: self.build_dir / ("pcap_" + name + suffix)
@@ -147,7 +173,7 @@ class LiveSession:
         self.directory = REPO / "results" / "tmp" / ("live_" + stamp)
         self.directory.mkdir(parents=True)
         self.config = self.directory / "scenario.cfg"
-        self.settings = scenario(pedestrians, self.config)
+        self.settings = scenario(pedestrians, self.config, base_exit_width)
         self.runs = {}
         for name in NAMES:
             prefix = self.directory / name
@@ -264,7 +290,22 @@ def draw_room(canvas, frame, settings, color):
             canvas.create_oval(px - 2, py - 2, px + 2, py + 2, fill=color, outline="")
 
 
-def run_gui(build_dir, pedestrians):
+def risk_display(row):
+    """Summarize model indicators for the selected simulation step."""
+    category = row["risk_category"].lower()
+    if category not in ("low", "medium", "high"):
+        raise ValueError(f"unknown risk category: {category}")
+    detail = (f"Peak density: {float(row['peak_density']):.2f} people/m²  ·  "
+              f"Mean pedestrian speed: {float(row['average_speed']):.2f} m/s\n"
+              f"Congested cells: {int(row['congested_cells'])}  ·  "
+              f"Max continuous: {float(row['max_consecutive_seconds']):.2f}s  ·  "
+              f"Max cumulative: {float(row['max_cumulative_seconds']):.2f}s\n"
+              f"Bottleneck occupancy: {int(row['bottleneck_occupancy'])}  ·  "
+              f"Exit flow: {float(row['exit_flow_per_second']):.1f} people/s")
+    return category, detail
+
+
+def run_gui(build_dir, pedestrians, base_exit_width=4):
     import tkinter as tk
     from tkinter import messagebox, ttk
 
@@ -275,13 +316,22 @@ def run_gui(build_dir, pedestrians):
     outer = ttk.Frame(root, padding=12)
     outer.pack(fill="both", expand=True)
     ttk.Label(outer, text="Live five-backend simulation", font=("Segoe UI", 18, "bold")).pack(anchor="w")
-    ttk.Label(outer, text="All five processes run independently. Pause freezes only a panel's view; seek, Back and Forward inspect recorded frames. Live resumes the newest frame. The chart adds each backend's snapshots as they arrive.",
+    ttk.Label(outer, text="All five processes run independently. Pause and seek inspect recorded frames; Live returns to the newest one. Risk labels are uncalibrated simulation indicators. The room and selected exit width scale with crowd size.",
               wraplength=1200).pack(anchor="w", pady=(5, 8))
+    style = ttk.Style(root)
+    for category, color in (("low", "#176447"), ("medium", "#8b5a00"),
+                            ("high", "#a32232"), ("waiting", "#4b5b67")):
+        style.configure(f"Risk.{category}.TLabel", foreground=color,
+                        font=("Segoe UI", 10, "bold"))
     controls = ttk.Frame(outer)
     controls.pack(fill="x", pady=(0, 8))
     ttk.Label(controls, text="Number of pedestrians:").pack(side="left")
     count = tk.StringVar(value=str(pedestrians))
     ttk.Spinbox(controls, from_=1, to=5000, textvariable=count, width=9).pack(side="left", padx=8)
+    ttk.Label(controls, text="Exit width at 100 people (m):").pack(side="left", padx=(10, 0))
+    width_var = tk.StringVar(value=str(base_exit_width))
+    ttk.Combobox(controls, textvariable=width_var, values=("1", "2", "4"),
+                 state="readonly", width=4).pack(side="left", padx=8)
     session = [None]
     completed = [False]
     cards = {}
@@ -334,9 +384,14 @@ def run_gui(build_dir, pedestrians):
         card.grid(row=i // 3, column=i % 3, sticky="n", padx=6, pady=6)
         label = ttk.Label(card, text="Waiting", wraplength=410)
         label.pack(anchor="w")
+        risk_label = ttk.Label(card, text="Risk proxy: waiting", style="Risk.waiting.TLabel")
+        risk_label.pack(anchor="w", pady=(3, 0))
+        indicator_label = ttk.Label(card, text="Crowd indicators will appear with the first frame.",
+                                    wraplength=410, justify="left")
+        indicator_label.pack(anchor="w", pady=(2, 3))
         metric_label = ttk.Label(card, text="Wall: —  ·  Update: —  ·  Metrics: —", wraplength=410)
         metric_label.pack(anchor="w", pady=(2, 0))
-        speed_label = ttk.Label(card, text="Average speed: —  ·  Exit rate: —", wraplength=410)
+        speed_label = ttk.Label(card, text="Compute pace: —  ·  Wall exit rate: —", wraplength=410)
         speed_label.pack(anchor="w", pady=(2, 0))
         outcome_label = ttk.Label(card, text="", wraplength=410)
         outcome_label.pack(anchor="w", pady=(2, 2))
@@ -354,7 +409,7 @@ def run_gui(build_dir, pedestrians):
         canvas.pack(pady=(5, 0))
         seekbar.configure(command=lambda value, n=name: seek(n, value))
         cards[name] = dict(canvas=canvas, label=label, metric=metric_label,
-                           speed=speed_label,
+                           risk=risk_label, indicators=indicator_label, speed=speed_label,
                            outcome=outcome_label, seekbar=seekbar, pause=pause_button,
                            cursor=PlaybackCursor(), shown=None, updating=False)
 
@@ -388,13 +443,14 @@ def run_gui(build_dir, pedestrians):
         if session[0] is not None:
             session[0].close()
         try:
-            current = LiveSession(build_dir, int(count.get()))
+            current = LiveSession(build_dir, int(count.get()), int(width_var.get()))
         except (ValueError, FileNotFoundError, OSError) as error:
             messagebox.showerror("Cannot start simulation", str(error))
             return
         session[0] = current
         completed[0] = False
         start_button.configure(state="disabled")
+        geometry_label.configure(text=f"Actual exit opening: {current.settings['exit_width']:g} m")
         for name in NAMES:
             card = cards[name]
             card["cursor"] = PlaybackCursor()
@@ -405,8 +461,10 @@ def run_gui(build_dir, pedestrians):
             card["updating"] = False
             draw_room(card["canvas"], None, current.settings, COLORS[name])
             card["label"].configure(text="Running…")
+            card["risk"].configure(text="Risk proxy: waiting", style="Risk.waiting.TLabel")
+            card["indicators"].configure(text="Crowd indicators will appear with the first frame.")
             card["metric"].configure(text="Wall: starting  ·  Update: pending  ·  Metrics: pending")
-            card["speed"].configure(text="Average speed: pending  ·  Exit rate: pending")
+            card["speed"].configure(text="Compute pace: pending  ·  Wall exit rate: pending")
             card["outcome"].configure(text="")
             card["pause"].configure(text="Pause")
             legend_labels[name].configure(text=f"{name.upper()}: starting")
@@ -414,6 +472,8 @@ def run_gui(build_dir, pedestrians):
 
     start_button = ttk.Button(controls, text="Run all five", command=start)
     start_button.pack(side="left", padx=8)
+    geometry_label = ttk.Label(controls, text="")
+    geometry_label.pack(side="left", padx=(8, 0))
 
     chart_lengths = [None]
 
@@ -428,6 +488,7 @@ def run_gui(build_dir, pedestrians):
             for name, run in current.runs.items():
                 card = cards[name]
                 cursor = card["cursor"]
+                selected_step = None
                 if run.history:
                     index = cursor.selected(len(run.history))
                     frame = run.history[index]
@@ -439,6 +500,7 @@ def run_gui(build_dir, pedestrians):
                     card["seekbar"].set(index)
                     card["updating"] = False
                     step, simulated_time, _, active, _ = frame
+                    selected_step = step
                     mode = "Live" if cursor.follow else f"Paused · frame {index + 1}/{len(run.history)}"
                     detail = (f"{mode} · step {step}/{current.settings['steps']} · "
                               f"model t={simulated_time:.1f}s · "
@@ -448,13 +510,23 @@ def run_gui(build_dir, pedestrians):
                     detail = "Initializing"
                 card["pause"].configure(text="Pause" if cursor.follow else "Resume")
                 card["label"].configure(text=detail)
+                recorded = run.metric_rows.get(selected_step)
+                if recorded is not None:
+                    category, indicators = risk_display(recorded)
+                    card["risk"].configure(text=f"Risk proxy: {category.upper()}",
+                                           style=f"Risk.{category}.TLabel")
+                    card["indicators"].configure(text=indicators)
+                elif selected_step is not None:
+                    card["risk"].configure(text="Risk proxy: metrics pending",
+                                           style="Risk.waiting.TLabel")
+                    card["indicators"].configure(text="Waiting for this frame's metric row.")
                 if run.latest is not None:
                     wall = max(run.wall_seconds, 0.001)
                     model_speed = run.latest[1] / wall
                     exit_rate = (current.pedestrians - run.latest[3]) / wall
                     card["speed"].configure(
-                        text=f"Average speed: {model_speed:.1f} model s / wall s  ·  "
-                             f"Exit rate: {exit_rate:.1f} people / wall s")
+                        text=f"Compute pace: {model_speed:.1f} model s / wall s  ·  "
+                             f"Wall exit rate: {exit_rate:.1f} people / wall s")
                 if run.ended is None:
                     update = f"{run.update_ms:.2f}ms" if run.update_ms is not None else "pending"
                     card["metric"].configure(text=f"Wall: {run.wall_seconds:.2f}s running  ·  Update: {update}  ·  Metrics: pending")
@@ -488,10 +560,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build-dir", type=Path, default=REPO / "build-all")
     parser.add_argument("--pedestrians", type=int, default=2000)
+    parser.add_argument("--exit-width", type=int, choices=(1, 2, 4), default=4,
+                        help="exit width in metres at the 100-pedestrian base size")
     parser.add_argument("--headless", action="store_true", help="run and report without opening the GUI")
     args = parser.parse_args()
     if args.headless:
-        session = LiveSession(args.build_dir, args.pedestrians)
+        session = LiveSession(args.build_dir, args.pedestrians, args.exit_width)
         try:
             while not session.poll():
                 time.sleep(0.08)
@@ -504,7 +578,7 @@ def main():
         finally:
             session.close()
     else:
-        run_gui(args.build_dir, args.pedestrians)
+        run_gui(args.build_dir, args.pedestrians, args.exit_width)
 
 
 if __name__ == "__main__":

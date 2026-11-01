@@ -183,6 +183,7 @@ void MetricsOutput::record(const MetricsSnapshot& m) {
              << config_.congestion_density_threshold << ',' << config_.congestion_speed_threshold
              << ',' << config_.high_congestion_seconds << ',' << config_.bottleneck_depth << ','
              << config_.bottleneck_margin << '\n';
+    summary_.flush();  // Live viewers consume each completed metric row.
     for (int row = 0; row < tracker_.rows(); ++row) {
         for (int column = 0; column < tracker_.columns(); ++column) {
             const auto& cell = m.cells[static_cast<std::size_t>(row) * tracker_.columns() + column];

@@ -95,11 +95,16 @@ For a live comparison, build all five executables and run:
 python scripts\live_compare.py --build-dir build-all
 ```
 
-Enter the number of pedestrians (1–5,000) and click **Run all five**. The
+Enter the number of pedestrians (1–5,000), choose a base exit width of 1, 2,
+or 4 m, and click **Run all five**. The
 desktop window launches five independent processes, draws each backend's
 snapshots as they arrive, and shows its actual wall-clock completion time and
 reported backend time. The room and exit scale with crowd size to keep initial
-density comparable. Live runs continue until everyone exits or the displayed
+density comparable; the UI shows the resulting actual exit width. Each panel
+shows the selected frame's peak density, mean pedestrian speed, congested
+cells, congestion durations, bottleneck occupancy, exit flow, and low/medium/high
+simulation risk proxy from the backend's metric file. These are not calibrated
+injury predictions. Live runs continue until everyone exits or the displayed
 maximum step is reached; if anyone remains, the panel says so. The window
 scrolls vertically and horizontally. Each panel shows wall time, update time,
 average simulation speed, and exit rate while running, then its final backend
@@ -111,6 +116,8 @@ backends and grows as their snapshots arrive. The default of 2,000 makes
 progress easier to see. Concurrent runs share
 CPU and GPU resources, so use the repeated benchmark results for fair speed
 comparisons.
+Use `--exit-width 1` (or 2 or 4) with `--headless` for the same scenario
+selection without the window.
 
 On multi-configuration generators, executables may be under `build/Release/`.
 Each run writes `_snapshots.csv`, `_summary.csv`, `_run.csv`, `_metrics.csv`,
