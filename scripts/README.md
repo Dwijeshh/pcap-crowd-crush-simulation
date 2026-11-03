@@ -29,6 +29,10 @@ compares six crowd/exit scenarios across all five backends, saves density,
 speed, congestion, exit-flow and risk-category data, and links the 100-person
 cases to the existing repeated timing benchmark. See
 [report studies](../docs/report_studies.md) for methods and limitations.
+The report's vector figures and separate review PDF are built by
+[`report/ieee/build_figures.py`](../report/ieee/build_figures.py) and
+[`report/build_report.py`](../report/build_report.py); see the
+[report guide](../report/README.md) before editing the manuscript.
 
 `live_compare.py` opens a Tkinter window with pedestrian-count and base-exit-width
 inputs and

@@ -1,4 +1,12 @@
-# Implementation roadmap
+# Implementation roadmap (historical)
+
+This was the team's original four-week plan. The sequential, OpenMP, MPI,
+CUDA, and hybrid implementations, live comparison UI, validation, and
+benchmark/risk studies are now implemented. See the [root README](../README.md)
+for how to run them, [hybrid validation](hybrid_validation.md) for backend
+agreement, [report studies](report_studies.md) for measured results, and the
+[IEEE report guide](../report/README.md) for the paper artifacts. The items
+below describe development order rather than outstanding tasks.
 
 ## Week 1: verified reference
 
