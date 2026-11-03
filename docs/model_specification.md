@@ -1,8 +1,9 @@
-# Shared movement model: proposed reference contract
+# Shared movement model: implemented reference contract
 
-Sammit's sequential and CUDA implementations use the **same** `update_one` function in
-`include/model.hpp`. Dwijesh and Ayush should review this proposed contract before
-building their backends. It is a deliberately simplified, deterministic model
+The sequential, OpenMP, MPI, CUDA, and hybrid backends use the movement rule
+defined by `update_one` in `include/model.hpp`; the hybrid reuses the CUDA
+updater for each MPI-owned ID range. This is the implemented reference
+contract. It is a deliberately simplified, deterministic model
 inspired by the social-force approach of [Helbing, Farkas and Vicsek (2000)](https://doi.org/10.1038/35035023).
 It does **not** reproduce their full panic model or provide calibrated injury risk.
 
@@ -77,5 +78,6 @@ timing boundaries are documented in `hybrid_validation.md`.
 Density, speed, congestion thresholds, bottleneck occupancy, exit flow, and
 risk proxy definitions are in [the metrics specification](metrics_specification.md).
 The visualization's 1 m heatmap grid is descriptive only and is not a risk
-score. All parallel backends must adopt the equations, guards and exit rule
-above before numerical comparison.
+score. Cross-backend numerical comparisons in
+[hybrid validation](hybrid_validation.md) use these equations, guards, and
+exit rule.

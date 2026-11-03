@@ -1,9 +1,16 @@
 # Correctness checks
 
-Cover one pedestrian, pair interaction, walls, exit crossing, empty crowd and reproducible initialization.
-Compare positions/velocities after one step and short runs across backends.
-Check exited counts, cell metrics, uneven MPI partitions and invalid numeric values.
-Document absolute/relative tolerances and test time-step stability.
+`model_tests.cpp` covers empty and single-pedestrian runs, exit crossing,
+pair interaction, wall handling, seeded initialization, finite states, and a
+time-step refinement comparison. `metrics_tests.cpp` covers clipped grid
+areas, density, speed, congestion duration, risk category, exit flow, and an
+empty crowd. OpenMP and MPI tests compare movement with the sequential
+reference; MPI tests run with one, two, and four ranks when MPI is available.
+
+From a Visual Studio multi-configuration build, run
+`ctest --test-dir build-all -C Release --output-on-failure`. The full build
+registers six CTest cases. Missing optional dependencies mean fewer targets
+and tests are registered.
 
 `compare_snapshots.py` compares snapshot CSVs from two backends for the same
 scenario. It requires identical step, agent ID, and active state, and a maximum

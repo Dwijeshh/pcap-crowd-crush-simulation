@@ -15,3 +15,8 @@ five SVG figures. `risk_study/` contains 30 backend/scenario summaries,
 1,830 metric time-series rows, six SVG figures, and a join to the matching
 100-person five-backend timing cases. Methods and limits are in
 `docs/report_studies.md`.
+
+The [IEEE report](../report/README.md) uses these committed summaries and
+figures. Its numeric agreement values describe backend consistency, not
+accuracy against observed pedestrian behavior. Do not use the risk labels as
+calibrated injury probabilities.

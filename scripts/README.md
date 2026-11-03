@@ -29,8 +29,13 @@ compares six crowd/exit scenarios across all five backends, saves density,
 speed, congestion, exit-flow and risk-category data, and links the 100-person
 cases to the existing repeated timing benchmark. See
 [report studies](../docs/report_studies.md) for methods and limitations.
+The report's vector figures and separate review PDF are built by
+[`report/ieee/build_figures.py`](../report/ieee/build_figures.py) and
+[`report/build_report.py`](../report/build_report.py); see the
+[report guide](../report/README.md) before editing the manuscript.
 
-`live_compare.py` opens a Tkinter window with a pedestrian-count input and
+`live_compare.py` opens a Tkinter window with pedestrian-count and base-exit-width
+inputs and
 runs all five built executables concurrently. It reads snapshots while each
 process is running, with no playback clock. Its wall times include launch and
 output overhead; the executables' reported times use their own timing scopes.
@@ -39,5 +44,10 @@ scrolls to keep metrics and controls accessible. Each panel has Pause, seek,
 Back, Forward, and Live controls; these change only the viewed snapshot and do
 not affect the backend process. A shared live chart overlays the five exit
 curves against observed wall time as snapshots arrive.
+Each panel displays the selected frame's density, pedestrian speed, congestion
+counts and durations, bottleneck occupancy, exit flow, and simulation risk
+category from its live `_metrics.csv`. Exit widths 1, 2, and 4 m are specified
+for the 100-person base room and scale with larger crowds.
 Run `python scripts/live_compare.py --build-dir build-all` from the repo root.
-Use `--headless --pedestrians 1000` to run the same comparison without a window.
+Use `--headless --pedestrians 1000 --exit-width 2` to run the same comparison
+without a window.
