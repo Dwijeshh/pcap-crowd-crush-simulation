@@ -1,210 +1,97 @@
 # Parallel Crowd-Crush Risk Simulation
 
-PCAP team project comparing sequential CPU, OpenMP, MPI, CUDA, and hybrid MPI + OpenMP + CUDA execution of the same pedestrian simulation.
+A reproducible pedestrian simulation implemented in five computing backends: sequential CPU, OpenMP, MPI, CUDA, and MPI + CUDA + OpenMP hybrid. The project compares computing performance and simulated congestion near an exit using one shared movement model and common output formats.
 
-## Contributions
+> **Research scope:** Density, congestion, and low/medium/high labels are model indicators. They have not been calibrated against real pedestrian trajectories or injury outcomes.
 
-| Member | Completed work |
+## Results at a glance
+
+| Experiment | Recorded result |
 | --- | --- |
-| Sammit Menon | Shared movement model, sequential baseline, CUDA backend, initial visualization, and CPU/CUDA benchmarks and figures ([#1](https://github.com/Dwijeshh/pcap-crowd-crush-simulation/pull/1), [#2](https://github.com/Dwijeshh/pcap-crowd-crush-simulation/pull/2)) |
-| Dwijesh P | OpenMP backend, shared crowd metrics and risk indicators, correctness comparisons, CUDA metric collection, hybrid backend, five-backend benchmarking, live comparison UI, and report studies ([#3](https://github.com/Dwijeshh/pcap-crowd-crush-simulation/pull/3), [#5](https://github.com/Dwijeshh/pcap-crowd-crush-simulation/pull/5), [#7](https://github.com/Dwijeshh/pcap-crowd-crush-simulation/pull/7), [#8](https://github.com/Dwijeshh/pcap-crowd-crush-simulation/pull/8)) |
-| Ayush KL | MPI backend, distributed state exchange, MPI tests, and MPI build integration ([#4](https://github.com/Dwijeshh/pcap-crowd-crush-simulation/pull/4)) |
+| Implementation checks | Six CTest cases passed in the complete local build; tested backends agreed on exit counts and recorded risk categories. |
+| 5,000 pedestrians, 100 steps | Median movement time: sequential 2,841.54 ms; OpenMP 938.40 ms; MPI 1,436.00 ms; CUDA 138.34 ms; hybrid 284.19 ms. CUDA was 20.54× faster than sequential by this timing measure. |
+| 100 pedestrians, 12 simulated seconds | With 1 m, 2 m, and 4 m exits, 26, 44, and 52 people exited, respectively. Recorded peak density decreased from 6 to 4 to 3 people/m². |
 
-The parallel backends use Sammit's shared sequential movement rule.
+These results come from one Windows laptop with one RTX 3050 GPU. Each benchmark setting had one warm-up and five measured runs. Timing scopes differ among backends, so the speed ratios describe this local benchmark rather than identical end-to-end run time. See the [validation record](docs/hybrid_validation.md), [experiment protocol](docs/experiments.md), and [raw results](results/README.md).
 
-## Project layout
+## Quick start
 
-| Path | Purpose |
-| --- | --- |
-| include/ | Shared state, configuration, movement model, metrics declarations |
-| src/common/ | Shared initialization, equations, geometry, I/O, metrics |
-| src/sequential/ | Sequential CPU reference |
-| src/openmp/ | OpenMP implementation |
-| src/mpi/ | MPI implementation |
-| src/cuda/ | CUDA kernels and host code |
-| src/hybrid/ | MPI + OpenMP + CUDA integration |
-| configs/ | Reproducible scenario configurations |
-| scripts/ | Benchmark, visualization, plotting scripts |
-| tests/ | Model checks and cross-backend correctness checks |
-| results/ | Selected benchmark tables and plots |
-| [docs/](docs/README.md) | Model, metrics, validation, and experiment guides |
-| report/ | IEEE conference source, vector figures, and review PDF |
+### Requirements
 
-## Current status
+- CMake 3.18 or newer and a C++17 compiler for the sequential backend.
+- OpenMP support for `pcap_openmp`.
+- An MPI runtime and development SDK for `pcap_mpi`.
+- An NVIDIA GPU and CUDA toolkit for `pcap_cuda`.
+- MPI, OpenMP, and CUDA together for `pcap_hybrid`.
+- Python 3 with Tkinter for the live desktop comparison. The simulation and visualization scripts use the Python standard library; generating the separate review PDF also requires ReportLab.
 
-Sequential, OpenMP, MPI, CUDA, and hybrid MPI + OpenMP + CUDA executables are
-implemented. CMake builds OpenMP, MPI, CUDA, and hybrid targets when their
-dependencies are available. All backends write the shared crowd metrics;
-CUDA can disable metric collection with `--no-metrics` for movement-only
-benchmarking. The metrics are configurable simulation indicators, not
-calibrated physical injury predictions.
+CMake skips optional backends whose dependencies are unavailable. On Windows, the full build uses Visual Studio, Microsoft MPI, and CUDA integration.
 
-The [metrics specification](docs/metrics_specification.md),
-[hybrid and five-backend validation](docs/hybrid_validation.md),
-[OpenMP validation](docs/openmp_validation.md), and
-[CUDA validation](docs/cuda_validation.md) record definitions and checks.
-Sammit's separate CUDA block-size study is in
-[the CUDA benchmark report](docs/sammit_benchmarks.md).
-The [IEEE report source](report/ieee/main.tex), its
-[figures and build notes](report/README.md), and a
-[three-page review PDF](report/PCAP_IEEE_Final_Report.pdf) summarize the
-implemented system and measured results. The review PDF is a separate render;
-export the IEEEtran source for a formal submission.
+### Build and test on Windows (PowerShell)
 
-## Build and run
-
-Requires CMake and a C++17 compiler. OpenMP support enables `pcap_openmp`;
-an MPI runtime and development SDK enable `pcap_mpi`; a CUDA toolkit enables
-`pcap_cuda`. All three are needed for `pcap_hybrid`. On Windows, Microsoft MPI
-and MSVC with CUDA integration are supported. CMake skips unavailable
-optional backends.
-
-```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --config Release
-ctest --test-dir build --output-on-failure
-mkdir -p results/tmp
-build/pcap_sequential configs/wide_exit.cfg results/tmp/wide
-build/pcap_openmp configs/wide_exit.cfg results/tmp/wide_openmp 4
-# If MPI was detected:
-mpiexec -n 2 build/pcap_mpi configs/wide_exit.cfg results/tmp/wide_mpi
-# If CUDA was detected:
-build/pcap_cuda configs/wide_exit.cfg results/tmp/wide_cuda 256
-# If MPI, OpenMP and CUDA were all detected:
-mpiexec -n 2 build/pcap_hybrid configs/wide_exit.cfg results/tmp/wide_hybrid 256 2
-python scripts/visualize.py animate configs/wide_exit.cfg results/tmp/wide_snapshots.csv results/tmp/wide.html
-python scripts/visualize.py heatmap configs/wide_exit.cfg results/tmp/wide_snapshots.csv results/tmp/wide_heatmap.svg
-python scripts/visualize.py timeseries configs/wide_exit.cfg results/tmp/wide_snapshots.csv results/tmp/wide_summary.csv results/tmp/wide
-```
-
-On Windows with Visual Studio, run these PowerShell commands from the repository
-root. Optional targets appear only when CMake finds their dependencies:
+Run these commands **from the repository root**:
 
 ```powershell
 cmake -S . -B build-all -G 'Visual Studio 17 2022' -A x64
 cmake --build build-all --config Release
 ctest --test-dir build-all -C Release --output-on-failure
+```
+
+### Run a scenario
+
+```powershell
 New-Item -ItemType Directory -Force results\tmp | Out-Null
 .\build-all\Release\pcap_sequential.exe configs\wide_exit.cfg results\tmp\seq
 .\build-all\Release\pcap_openmp.exe configs\wide_exit.cfg results\tmp\omp 4
-# Run these only when the corresponding targets and MPI launcher are available:
+```
+
+If the matching executables were built, run the other backends with separate output prefixes:
+
+```powershell
 mpiexec -n 2 .\build-all\Release\pcap_mpi.exe configs\wide_exit.cfg results\tmp\mpi
 .\build-all\Release\pcap_cuda.exe configs\wide_exit.cfg results\tmp\cuda 256
 mpiexec -n 2 .\build-all\Release\pcap_hybrid.exe configs\wide_exit.cfg results\tmp\hybrid 256 2
 ```
 
-To watch all five completed runs side by side on one synchronized timeline,
-run each backend with the same config and different output prefixes, then run:
+For a single-configuration generator on Linux or macOS, use `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release`, build with `cmake --build build`, and run executables directly from `build/`. CUDA requires supported NVIDIA hardware.
 
-```sh
-python scripts/visualize.py compare configs/wide_exit.cfg \
-  results/tmp/seq_snapshots.csv results/tmp/omp_snapshots.csv \
-  results/tmp/mpi_snapshots.csv results/tmp/cuda_snapshots.csv \
-  results/tmp/hybrid_snapshots.csv results/tmp/comparison.html
-```
+### Watch all five runs live
 
-Open `results/tmp/comparison.html` in a browser. **Model time** keeps all five
-panels on the same simulation step. **Compute time** advances each panel
-independently using cumulative `simulation_ms` from its matching `_summary.csv`;
-the page also shows `_run.csv` timing and speedup versus sequential. Playback
-is stretched for viewing and replays completed runs. Single-run timing
-boundaries differ by backend, so use the repeated benchmark results for
-performance claims.
-
-For a live comparison, build all five executables and run:
+After building all five backends and making `mpiexec` available, run:
 
 ```powershell
 python scripts\live_compare.py --build-dir build-all
 ```
 
-Enter the number of pedestrians (1–5,000), choose a base exit width of 1, 2,
-or 4 m, and click **Run all five**. The
-desktop window launches five independent processes, draws each backend's
-snapshots as they arrive, and shows its actual wall-clock completion time and
-reported backend time. The room and exit scale with crowd size to keep initial
-density comparable; the UI shows the resulting actual exit width. Each panel
-shows the selected frame's peak density, mean pedestrian speed, congested
-cells, congestion durations, bottleneck occupancy, exit flow, and low/medium/high
-simulation risk proxy from the backend's metric file. These are not calibrated
-injury predictions. Live runs continue until everyone exits or the displayed
-maximum step is reached; if anyone remains, the panel says so. The window
-scrolls vertically and horizontally. Each panel shows wall time, update time,
-average simulation speed, and exit rate while running, then its final backend
-and metrics times. **Pause** freezes
-only that panel's view; the seek bar, **Back**, and **Forward** inspect recorded
-snapshots while the backend keeps running. **Live** returns to its newest frame.
-The combined graph plots exited pedestrians against observed wall time for all five
-backends and grows as their snapshots arrive. The default of 2,000 makes
-progress easier to see. Concurrent runs share
-CPU and GPU resources, so use the repeated benchmark results for fair speed
-comparisons.
-Use `--exit-width 1` (or 2 or 4) with `--headless` for the same scenario
-selection without the window.
+Choose a pedestrian count and exit width, then select **Run all five**. Each backend runs as an independent process. Its panel shows live crowd metrics and real elapsed time; Pause, seek, Back, Forward, and Live control the displayed frames without stopping the process. A combined chart tracks exits as results arrive. Simultaneous runs share the laptop's CPU and GPU, so use the repeated benchmarks for performance claims. For a non-graphical run, add `--headless`.
 
-On multi-configuration generators, executables may be under `build/Release/`.
-Each run writes `_snapshots.csv`, `_summary.csv`, `_run.csv`, `_metrics.csv`,
-and `_cells.csv` at the output prefix. MPI adds `_mpi_timing.csv`; hybrid adds
-`_hybrid_timing.csv`. CUDA `--no-metrics` omits metric and cell files. Create
-the parent directory first. Movement and metric sampling have separate
-timers; CSV writing is outside both. Use identical scenarios and seeds when
-comparing backends. See [the model specification](docs/model_specification.md)
-for equations and timing definitions.
+Each output prefix produces snapshots, summaries, run timing, metrics, and per-cell CSV files. The [scripts guide](scripts/README.md) covers replay, visualization, and benchmark commands.
 
-For the CPU/CUDA benchmark, run `scripts/benchmark_cuda.py` with `--cpu` and
-`--cuda` pointing to Release executables. It performs a warm-up and five
-measured repetitions per case, then writes raw runs, summary statistics and
-SVG plots.
-For the five-backend comparison, run `scripts/benchmark_backends.py` with
-paths to the available executables and `--mpiexec`. The committed
-[raw runs, medians, and plots](results/benchmarks/all_backends/summary.csv)
-cover four crowd sizes and three exit widths. The hybrid report explains
-the timing boundaries and one-GPU limitation.
+## Reproduce the research
 
-## Report studies
+| Resource | Contents |
+| --- | --- |
+| [Model specification](docs/model_specification.md) | Movement equations, room geometry, state, and timing definitions |
+| [Metrics specification](docs/metrics_specification.md) | Density, speed, congestion, bottleneck, exit flow, and risk-label rules |
+| [Validation record](docs/hybrid_validation.md) | Cross-backend checks, hardware, numerical tolerances, and timing limits |
+| [Report studies](docs/report_studies.md) | Parallel configuration sweep and exit-width study |
+| [Raw data and plots](results/README.md) | Benchmark runs, summary tables, and SVG figures |
+| [Paper source and build guide](report/README.md) | IEEEtran manuscript, figure source, and separate review PDF |
 
-The [configuration and risk studies](docs/report_studies.md) add a 29-setting
-parallel sweep with CPU efficiency, plus density, speed, congestion and exit
-measurements across two crowd sizes and three exit widths. Their CSVs and
-figures are under `results/benchmarks/configuration_study/` and
-`results/risk_study/`. Run `python scripts/report_studies.py parallelism` and
-`python scripts/report_studies.py risk` to reproduce them with all five
-backends available.
+Use the same configuration and seed when comparing backends. The [experiment protocol](docs/experiments.md) describes warm-ups, repetition counts, medians, and timing boundaries. The manuscript is a research draft; the checked-in review PDF is a separate render, so compile and inspect the IEEEtran source before any formal submission.
 
-## IEEE report
+If you use this project in research before a paper is published, cite the repository URL and the commit you used. Add the paper citation after publication.
 
-The [report guide](report/README.md) distinguishes the editable IEEEtran
-document from the separately rendered review PDF. The paper compares the five
-backends, documents the one-GPU timing limitations, and analyzes the exit-width
-study. It reports numerical agreement with the sequential reference, not
-accuracy against observed pedestrian trajectories. Peak memory and user
-satisfaction were not measured, so the paper does not assign them values.
+## Contributors
 
-From the repository root, regenerate the vector figures and review PDF with
-Python and ReportLab:
+| Contributor | Main contributions |
+| --- | --- |
+| Sammit Menon | Movement model, sequential reference, CUDA backend, initial visualization, and CPU/CUDA benchmarks ([PR #1](https://github.com/Dwijeshh/pcap-crowd-crush-simulation/pull/1), [PR #2](https://github.com/Dwijeshh/pcap-crowd-crush-simulation/pull/2)) |
+| Ayush KL | MPI backend, state exchange, MPI tests, and build integration ([PR #4](https://github.com/Dwijeshh/pcap-crowd-crush-simulation/pull/4)) |
+| Dwijesh P | OpenMP backend, shared metrics, CUDA metric collection, hybrid integration, live UI, benchmarks, and report studies ([PR #3](https://github.com/Dwijeshh/pcap-crowd-crush-simulation/pull/3), [PR #5](https://github.com/Dwijeshh/pcap-crowd-crush-simulation/pull/5), [PR #7](https://github.com/Dwijeshh/pcap-crowd-crush-simulation/pull/7), [PR #8](https://github.com/Dwijeshh/pcap-crowd-crush-simulation/pull/8)) |
 
-```powershell
-python report\ieee\build_figures.py
-python report\build_report.py
-```
+The parallel backends retain the shared movement rule established by the sequential reference.
 
-Compile `report/ieee/main.tex` with IEEEtran to produce the formal conference
-PDF. The author names link to their email addresses in that source; the
-addresses are not printed in the byline.
+## Contributing and license
 
-## Development history
-
-The [original implementation roadmap](docs/implementation_plan.md) records
-how the project was staged. The completed backends and experiments are
-documented above; future research and validation limits are in the report.
-
-## Reproducibility rules
-
-Use identical initial conditions, seeds, precision and update rules across backends.
-Exclude visualization and file writing from simulation timing.
-Risk categories are simulation indicators, with documented thresholds.
-
-## Collaboration
-
-Create a feature branch for each task, then open a pull request into main.
-Do not independently change shared model equations; agree on the change as a team.
-Keep generated binaries, secrets and temporary outputs out of Git.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for build, validation, and pull request guidance, [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations, and [SECURITY.md](SECURITY.md) for private vulnerability reporting. The software and its code documentation are released under the [MIT License](LICENSE). The manuscript and research figures are scholarly works outside that software license; cite them normally and check their publication terms before reuse.

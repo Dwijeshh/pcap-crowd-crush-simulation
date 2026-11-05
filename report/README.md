@@ -12,6 +12,11 @@ The author names in `ieee/main.tex` are clickable email links. Email addresses
 are not displayed separately in the byline. The review PDF is generated from
 the separate ReportLab source and does not include those name links.
 
+The root MIT License covers the software and its code documentation. The
+manuscript and research figures are scholarly works with separate publication
+considerations; their reuse should follow the terms of any eventual journal
+publication.
+
 Build from the repository root with Python and ReportLab:
 
 ```powershell

@@ -82,3 +82,8 @@ results/tmp/
 results/benchmarks/all_backends/.working/
 results/samples/*_snapshots.csv
 results/samples/*_summary.csv
+
+# Local presentation and visualization build artifacts
+.chart-data-*/
+presentation/.build/
+tmp/
