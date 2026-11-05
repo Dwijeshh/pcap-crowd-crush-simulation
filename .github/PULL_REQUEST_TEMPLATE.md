@@ -19,4 +19,4 @@ Describe the change and why it is needed.
 - [ ] I updated relevant documentation.
 - [ ] I included reproducible evidence for changed behaviour.
 - [ ] I kept generated binaries, local outputs, and secrets out of this pull request.
-- [ ] I have the right to contribute the submitted material under the MIT License.
+- [ ] I have the right to submit this material and have included no third-party code or data without permission.
