@@ -127,7 +127,8 @@ If you use this project in research before a paper is published, cite the reposi
 
 The parallel backends retain the shared movement rule established by the sequential reference.
 
-## Contributing and license
+## Feedback and copyright
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for build, validation, and pull request guidance, [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations, and [SECURITY.md](SECURITY.md) for private vulnerability reporting. The software and its code documentation are released under the [MIT License](LICENSE). The manuscript and research figures are scholarly works outside that software license; cite them normally and check their publication terms before reuse.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for reproducibility feedback and team development guidance, [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations, and [SECURITY.md](SECURITY.md) for private vulnerability reporting. External code contributions are paused while the research is being prepared for publication.
 
+**The current repository version has no open-source license.** The authors retain their rights; please do not copy, modify, redistribute, or use its code, manuscript, or figures without permission. Public visibility on GitHub still permits viewing and forking under GitHub's terms. Earlier repository revisions were published with an MIT license, and removing that file does not withdraw permissions already granted for those revisions.
