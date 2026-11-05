@@ -12,11 +12,11 @@ The author names in `ieee/main.tex` are clickable email links. Email addresses
 are not displayed separately in the byline. The review PDF is generated from
 the separate ReportLab source and does not include those name links.
 
-The current repository version has no open-source license while the team
-prepares its research for publication. Contact the authors before reusing the
-software, manuscript, or research figures. Earlier repository revisions were
-published with an MIT license; removing it from the current version does not
-withdraw permissions already granted for those revisions.
+The root `LICENSE` file is an all rights reserved notice for the current
+version while the team prepares its research for publication. Contact the
+authors before reusing the software, manuscript, or research figures. Earlier
+repository revisions were published with an MIT license; the current notice
+does not withdraw permissions already granted for those revisions.
 
 Build from the repository root with Python and ReportLab:
 
