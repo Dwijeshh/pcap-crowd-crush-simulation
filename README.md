@@ -16,16 +16,39 @@ These results come from one Windows laptop with one RTX 3050 GPU. Each benchmark
 
 ## Quick start
 
-### Requirements
+### Requirements and installation
 
-- CMake 3.18 or newer and a C++17 compiler for the sequential backend.
-- OpenMP support for `pcap_openmp`.
-- An MPI runtime and development SDK for `pcap_mpi`.
-- An NVIDIA GPU and CUDA toolkit for `pcap_cuda`.
-- MPI, OpenMP, and CUDA together for `pcap_hybrid`.
-- Python 3 with Tkinter for the live desktop comparison. The simulation and visualization scripts use the Python standard library; generating the separate review PDF also requires ReportLab.
+The commands below use **Windows PowerShell** and the Visual Studio 2022 generator. Install these tools, then open a new PowerShell window so updated paths are available:
 
-CMake skips optional backends whose dependencies are unavailable. On Windows, the full build uses Visual Studio, Microsoft MPI, and CUDA integration.
+| Tool | Needed for | Install source |
+| --- | --- | --- |
+| Git | Cloning the repository | [Git for Windows](https://git-scm.com/download/win) |
+| CMake 3.18+ | Configuring and building every backend | [CMake downloads](https://cmake.org/download/) |
+| Visual Studio 2022 or Build Tools with **Desktop development with C++** | C++17 compiler, Windows SDK, OpenMP, and CUDA host compiler | [Microsoft C++ setup guide](https://learn.microsoft.com/en-us/cpp/build/vscpp-step-0-installation) |
+| Python 3 with Tkinter | Live desktop comparison and visualization scripts | [Python for Windows](https://www.python.org/downloads/windows/) |
+| Microsoft MPI **Runtime and SDK** | MPI and hybrid builds; `mpiexec` runs them | [MS-MPI downloads](https://learn.microsoft.com/en-us/message-passing-interface/microsoft-mpi) |
+| NVIDIA driver, CUDA-capable GPU, and CUDA Toolkit | CUDA and hybrid builds | [CUDA installation guide](https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/) |
+
+The **sequential** executable needs only CMake and the C++ tools. **OpenMP** uses the C++ tools' OpenMP support. **MPI** adds Microsoft MPI; **CUDA** adds the GPU, driver, and toolkit; **hybrid** needs all of them. CMake omits optional executables when it cannot find their dependencies. No `pip install` is needed to run the simulator or live viewer. Generating the separate review PDF additionally requires ReportLab.
+
+Check that the command-line tools you installed are available:
+
+```powershell
+cmake --version
+python --version
+Get-Command git, cmake, python, mpiexec, nvcc -ErrorAction SilentlyContinue |
+    Select-Object Name, Source
+```
+
+`mpiexec` and `nvcc` appear only after installing their optional components. CUDA users can also run `nvidia-smi` to check that Windows sees the GPU. `cl.exe` may be absent from an ordinary PowerShell session even when Visual Studio is installed; CMake's Visual Studio generator locates the compiler. NVIDIA's driver and CUDA toolkit must both be installed for current Windows CUDA releases.
+
+### Clone the repository
+
+```powershell
+git clone https://github.com/Dwijeshh/pcap-crowd-crush-simulation.git
+cd pcap-crowd-crush-simulation
+Test-Path .\CMakeLists.txt  # must print True
+```
 
 ### Build and test on Windows (PowerShell)
 
@@ -35,7 +58,10 @@ Run these commands **from the repository root**:
 cmake -S . -B build-all -G 'Visual Studio 17 2022' -A x64
 cmake --build build-all --config Release
 ctest --test-dir build-all -C Release --output-on-failure
+Get-ChildItem .\build-all\Release\pcap_*.exe | Select-Object -ExpandProperty Name
 ```
+
+The last command lists the backends that CMake actually built. If an executable is missing, check its requirement in the table above and rerun the configure and build commands.
 
 ### Run a scenario
 
@@ -43,6 +69,13 @@ ctest --test-dir build-all -C Release --output-on-failure
 New-Item -ItemType Directory -Force results\tmp | Out-Null
 .\build-all\Release\pcap_sequential.exe configs\wide_exit.cfg results\tmp\seq
 .\build-all\Release\pcap_openmp.exe configs\wide_exit.cfg results\tmp\omp 4
+```
+
+To view the sequential run in a browser:
+
+```powershell
+python scripts\visualize.py animate configs\wide_exit.cfg results\tmp\seq_snapshots.csv results\tmp\seq.html
+Start-Process .\results\tmp\seq.html
 ```
 
 If the matching executables were built, run the other backends with separate output prefixes:
@@ -53,7 +86,7 @@ mpiexec -n 2 .\build-all\Release\pcap_mpi.exe configs\wide_exit.cfg results\tmp\
 mpiexec -n 2 .\build-all\Release\pcap_hybrid.exe configs\wide_exit.cfg results\tmp\hybrid 256 2
 ```
 
-For a single-configuration generator on Linux or macOS, use `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release`, build with `cmake --build build`, and run executables directly from `build/`. CUDA requires supported NVIDIA hardware.
+On Linux or macOS with a suitable compiler, use `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release`, then `cmake --build build` and `ctest --test-dir build --output-on-failure`. Executables are under `build/`; optional MPI and CUDA targets still depend on detected toolchains and hardware. The validated full five-backend setup was on Windows.
 
 ### Watch all five runs live
 
@@ -66,6 +99,8 @@ python scripts\live_compare.py --build-dir build-all
 Choose a pedestrian count and exit width, then select **Run all five**. Each backend runs as an independent process. Its panel shows live crowd metrics and real elapsed time; Pause, seek, Back, Forward, and Live control the displayed frames without stopping the process. A combined chart tracks exits as results arrive. Simultaneous runs share the laptop's CPU and GPU, so use the repeated benchmarks for performance claims. For a non-graphical run, add `--headless`.
 
 Each output prefix produces snapshots, summaries, run timing, metrics, and per-cell CSV files. The [scripts guide](scripts/README.md) covers replay, visualization, and benchmark commands.
+
+If configuration says the source directory has no `CMakeLists.txt`, run `cd pcap-crowd-crush-simulation` first. If `mpiexec` or `nvcc` is unavailable, install the corresponding requirement and restart PowerShell. If `build-all\Release` lacks an optional executable, rerun CMake after installing that dependency.
 
 ## Reproduce the research
 
@@ -95,3 +130,4 @@ The parallel backends retain the shared movement rule established by the sequent
 ## Contributing and license
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for build, validation, and pull request guidance, [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations, and [SECURITY.md](SECURITY.md) for private vulnerability reporting. The software and its code documentation are released under the [MIT License](LICENSE). The manuscript and research figures are scholarly works outside that software license; cite them normally and check their publication terms before reuse.
+
